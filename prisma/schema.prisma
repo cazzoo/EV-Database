@@ -1,0 +1,265 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// User and Authentication
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Gamification
+  xp            Int       @default(0)
+  level         Int       @default(1)
+  credits       Int       @default(100) // Free credits for new users
+  totalEarned   Int       @default(0)
+  streak        Int       @default(0)
+  lastActiveAt  DateTime?
+
+  // Role system (merit-based)
+  role          Role      @default(NEWCOMER)
+
+  // Relations
+  accounts      Account[]
+  sessions      Session[]
+  contributions Contribution[]
+  achievements  UserAchievement[]
+  comments      Comment[]
+  votes         Vote[]
+  apiKeys       ApiKey[]
+  transactions  Transaction[]
+  followers     Follow[]  @relation("following")
+  following     Follow[]  @relation("follower")
+}
+
+model Account {
+  id                 String  @id @default(cuid())
+  userId             String
+  type               String
+  provider           String
+  providerAccountId  String
+  refresh_token      String?
+  access_token       String?
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String?
+  session_state      String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// EV Database Models
+model ElectricVehicle {
+  id          String   @id @default(cuid())
+  make        String
+  model       String
+  year        Int
+  trim        String?
+  battery     Float    // kWh
+  range       Int      // km WLTP
+  efficiency  Float    // Wh/km
+  charging    ChargingInfo?
+  performance PerformanceInfo?
+  price       Float?
+  image       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Contributors
+  contributions Contribution[]
+  comments      Comment[]
+  votes         Vote[]
+}
+
+model ChargingInfo {
+  id              String  @id @default(cuid())
+  acPower         Int     // kW
+  dcPower         Int     // kW
+  chargeCurve     String? // JSON string
+  evVehicleId     String  @unique
+  vehicle         ElectricVehicle @relation(fields: [evVehicleId], references: [id], onDelete: Cascade)
+}
+
+model PerformanceInfo {
+  id              String  @id @default(cuid())
+  acceleration    Float   // 0-100 km/h in seconds
+  topSpeed        Int     // km/h
+  drivetrain      String? // FWD, RWD, AWD
+  evVehicleId     String  @unique
+  vehicle         ElectricVehicle @relation(fields: [evVehicleId], references: [id], onDelete: Cascade)
+}
+
+// Gamification Models
+enum Role {
+  NEWCOMER
+  CONTRIBUTOR
+  EXPERT
+  MODERATOR
+  ADMIN
+  LEGEND
+}
+
+model Achievement {
+  id          String            @id @default(cuid())
+  name        String
+  description String
+  icon        String
+  xpReward    Int
+  rarity      AchievementRarity
+  criteria    String            // JSON describing how to unlock
+  users       UserAchievement[]
+}
+
+enum AchievementRarity {
+  COMMON
+  UNCOMON
+  RARE
+  EPIC
+  LEGENDARY
+}
+
+model UserAchievement {
+  id            String      @id @default(cuid())
+  userId        String
+  achievementId String
+  earnedAt      DateTime    @default(now())
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievement   Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, achievementId])
+}
+
+model Contribution {
+  id          String           @id @default(cuid())
+  type        ContributionType
+  status      ContributionStatus @default(PENDING)
+  content     String           // JSON or markdown
+  xpReward    Int              @default(0)
+  creditsCost Int              @default(0)
+  createdAt   DateTime         @default(now())
+  reviewedAt  DateTime?
+  userId      String
+  vehicleId   String?
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vehicle     ElectricVehicle? @relation(fields: [vehicleId], references: [id])
+}
+
+enum ContributionType {
+  ADD_VEHICLE
+  UPDATE_SPECS
+  ADD_PHOTO
+  FIX_DATA
+  REVIEW
+}
+
+enum ContributionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  REVISION
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  userId    String
+  vehicleId String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vehicle   ElectricVehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+}
+
+model Vote {
+  id        String   @id @default(cuid())
+  value     Int      // 1 or -1
+  createdAt DateTime @default(now())
+  userId    String
+  vehicleId String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vehicle   ElectricVehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, vehicleId])
+}
+
+model Follow {
+  id          String   @id @default(cuid())
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+  follower    User     @relation("follower", fields: [followerId], references: [id], onDelete: Cascade)
+  following   User     @relation("following", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+}
+
+// API and Credits System
+model ApiKey {
+  id          String    @id @default(cuid())
+  key         String    @unique
+  name        String
+  tier        ApiTier   @default(FREE)
+  rateLimit   Int       @default(100)
+  monthlyUsed Int       @default(0)
+  lastUsedAt  DateTime?
+  expiresAt   DateTime?
+  active      Boolean   @default(true)
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum ApiTier {
+  FREE
+  BASIC
+  PRO
+  ENTERPRISE
+}
+
+model Transaction {
+  id          String          @id @default(cuid())
+  type        TransactionType
+  amount      Int
+  description String
+  createdAt   DateTime        @default(now())
+  userId      String
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum TransactionType {
+  EARN_CONTRIBUTION
+  EARN_VOTE
+  EARN_STREAK
+  PURCHASE_CREDITS
+  API_USAGE
+  ACHIEVEMENT_REWARD
+  LEVEL_UP_BONUS
+}
