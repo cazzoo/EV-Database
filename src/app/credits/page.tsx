@@ -64,7 +64,7 @@ const API_CREDIT_COSTS = [
     operations: [
       { endpoint: "GET /api/vehicles", description: "List all vehicles", credits: 1 },
       { endpoint: "GET /api/vehicles/[slug]", description: "Get vehicle details", credits: 1 },
-      { endpoint: "POST /api/vehicles", description: "Add new vehicle (contribution)", credits: 5 },
+      { endpoint: "POST /api/vehicles", description: "Add new vehicle (contribution)", credits: 1 },
     ],
   },
   {
@@ -78,11 +78,11 @@ const API_CREDIT_COSTS = [
   {
     category: "Community Features",
     operations: [
-      { endpoint: "GET /api/contributions", description: "List contributions", credits: 1 },
-      { endpoint: "POST /api/contributions", description: "Submit contribution", credits: 5 },
-      { endpoint: "GET /api/reviews", description: "List reviews", credits: 1 },
-      { endpoint: "POST /api/reviews", description: "Submit review", credits: 2 },
-      { endpoint: "GET /api/leaderboard", description: "Get leaderboard", credits: 1 },
+      { endpoint: "GET /api/contributions", description: "List contributions", credits: 0 },
+      { endpoint: "POST /api/contributions", description: "Submit contribution", credits: 1 },
+      { endpoint: "GET /api/reviews", description: "List reviews", credits: 0 },
+      { endpoint: "POST /api/reviews", description: "Submit review", credits: 1 },
+      { endpoint: "GET /api/leaderboard", description: "Get leaderboard", credits: 0 },
     ],
   },
   {
@@ -305,6 +305,15 @@ export default function CreditsPage() {
               Each API call consumes credits based on the operation. GET requests typically cost 1 credit,
               while POST/PUT/DELETE operations may cost more due to their impact on the database.
             </p>
+            <div className="alert alert-success mb-6">
+              <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div>
+                <h4 className="font-bold">Community Contributions are Encouraged!</h4>
+                <p className="text-sm">Community-related operations (contributions, reviews, leaderboard) are free or minimal cost to encourage participation. Help grow our EV database!</p>
+              </div>
+            </div>
             {API_CREDIT_COSTS.map((category) => (
               <div key={category.category} className="mb-8">
                 <h3 className="font-bold text-lg mb-4 text-primary">{category.category}</h3>
