@@ -40,6 +40,7 @@ model User {
   transactions  Transaction[]
   followers     Follow[]  @relation("following")
   following     Follow[]  @relation("follower")
+  apiUsage      ApiUsage[]
 }
 
 model Account {
@@ -262,4 +263,22 @@ enum TransactionType {
   API_USAGE
   ACHIEVEMENT_REWARD
   LEVEL_UP_BONUS
+}
+
+// API Usage Tracking - monitors API consumption per user
+model ApiUsage {
+  id          String   @id @default(cuid())
+  endpoint    String   // API endpoint called
+  method      String   // HTTP method (GET, POST, etc.)
+  statusCode  Int      // HTTP response status code
+  creditsUsed Int      @default(1) // Credits consumed by this call
+  responseTime Int     // Response time in milliseconds
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([createdAt])
 }

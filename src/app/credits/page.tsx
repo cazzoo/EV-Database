@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CreditCard, Zap, DollarSign, Shield, Badge, CheckCircle } from "lucide-react";
+import { CreditCard, Zap, DollarSign, Shield, Badge, CheckCircle, Activity, TrendingUp, Database } from "lucide-react";
 
 const CREDIT_PACKAGES = [
   {
@@ -54,6 +54,66 @@ const API_PRICING = [
     credits: "Unlimited",
     calls: "100,000 calls/day",
     features: ["Full API access", "Real-time updates", "Webhooks", "Priority support"],
+  },
+];
+
+// Credit costs for different API operations
+const API_CREDIT_COSTS = [
+  {
+    category: "Vehicle Data",
+    operations: [
+      { endpoint: "GET /api/vehicles", description: "List all vehicles", credits: 1 },
+      { endpoint: "GET /api/vehicles/[slug]", description: "Get vehicle details", credits: 1 },
+      { endpoint: "POST /api/vehicles", description: "Add new vehicle (contribution)", credits: 5 },
+    ],
+  },
+  {
+    category: "User Data",
+    operations: [
+      { endpoint: "GET /api/users/[id]/stats", description: "Get user statistics", credits: 1 },
+      { endpoint: "GET /api/users/[id]/achievements", description: "Get user achievements", credits: 1 },
+      { endpoint: "GET /api/users/[id]/credits", description: "Get credit balance", credits: 0 },
+    ],
+  },
+  {
+    category: "Community Features",
+    operations: [
+      { endpoint: "GET /api/contributions", description: "List contributions", credits: 1 },
+      { endpoint: "POST /api/contributions", description: "Submit contribution", credits: 5 },
+      { endpoint: "GET /api/reviews", description: "List reviews", credits: 1 },
+      { endpoint: "POST /api/reviews", description: "Submit review", credits: 2 },
+      { endpoint: "GET /api/leaderboard", description: "Get leaderboard", credits: 1 },
+    ],
+  },
+  {
+    category: "Purchases & Credits",
+    operations: [
+      { endpoint: "GET /api/purchases", description: "List purchases", credits: 1 },
+      { endpoint: "POST /api/purchases", description: "Purchase credits package", credits: 0 },
+      { endpoint: "POST /api/users/[id]/credits", description: "Add credits (admin)", credits: 0 },
+    ],
+  },
+];
+
+// Usage examples
+const USAGE_EXAMPLES = [
+  {
+    scenario: "Small App / Hobby Project",
+    usage: "100-500 API calls/day",
+    credits: "100-500 credits/day",
+    recommended: "Basic Plan or Pro Pack (1500 credits)",
+  },
+  {
+    scenario: "Production Application",
+    usage: "1,000-10,000 API calls/day",
+    credits: "1,000-10,000 credits/day",
+    recommended: "Standard Plan or Pro Pack",
+  },
+  {
+    scenario: "Enterprise Integration",
+    usage: "50,000+ API calls/day",
+    credits: "Unlimited",
+    recommended: "Pro Plan or Enterprise Contact",
   },
 ];
 
@@ -229,6 +289,128 @@ export default function CreditsPage() {
                   Contribute to the community and earn free credits.
                   Help others while building your credit balance!
                 </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* API Credit Costs */}
+        <div className="card bg-base-100 shadow-lg mb-12">
+          <div className="card-body">
+            <h2 className="card-title mb-6">
+              <Database className="h-6 w-6 text-primary" />
+              API Credit Costs
+            </h2>
+            <p className="text-base-content/70 mb-6">
+              Each API call consumes credits based on the operation. GET requests typically cost 1 credit,
+              while POST/PUT/DELETE operations may cost more due to their impact on the database.
+            </p>
+            {API_CREDIT_COSTS.map((category) => (
+              <div key={category.category} className="mb-8">
+                <h3 className="font-bold text-lg mb-4 text-primary">{category.category}</h3>
+                <div className="overflow-x-auto">
+                  <table className="table table-zebra w-full">
+                    <thead>
+                      <tr>
+                        <th>Endpoint</th>
+                        <th>Description</th>
+                        <th className="text-center">Credits</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {category.operations.map((op, idx) => (
+                        <tr key={idx}>
+                          <td>
+                            <code className="bg-base-300 px-2 py-1 rounded text-sm">
+                              {op.endpoint}
+                            </code>
+                          </td>
+                          <td>{op.description}</td>
+                          <td className="text-center">
+                            <span className={`badge ${op.credits === 0 ? "badge-success" : op.credits <= 1 ? "badge-info" : "badge-warning"}`}>
+                              {op.credits === 0 ? "Free" : `${op.credits} credit${op.credits > 1 ? "s" : ""}`}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Usage Examples */}
+        <div className="card bg-base-100 shadow-lg mb-12">
+          <div className="card-body">
+            <h2 className="card-title mb-6">
+              <TrendingUp className="h-6 w-6 text-primary" />
+              Usage Examples
+            </h2>
+            <p className="text-base-content/70 mb-6">
+              Not sure how many credits you need? Here are some common use cases to help you plan.
+            </p>
+            <div className="overflow-x-auto">
+              <table className="table table-zebra w-full">
+                <thead>
+                  <tr>
+                    <th>Use Case</th>
+                    <th>Estimated Usage</th>
+                    <th>Credit Consumption</th>
+                    <th>Recommended Plan</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {USAGE_EXAMPLES.map((example, idx) => (
+                    <tr key={idx}>
+                      <td className="font-bold">{example.scenario}</td>
+                      <td>{example.usage}</td>
+                      <td>{example.credits}</td>
+                      <td>
+                        <span className="badge badge-primary">{example.recommended}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        {/* API Usage Tracking */}
+        <div className="card bg-base-100 shadow-lg mb-12">
+          <div className="card-body">
+            <h2 className="card-title mb-6">
+              <Activity className="h-6 w-6 text-primary" />
+              Track Your API Usage
+            </h2>
+            <p className="text-base-content/70 mb-6">
+              All API calls are automatically tracked. You can monitor your usage in real-time
+              through the dashboard or by checking your credit balance.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="stat bg-base-200 rounded-lg">
+                <div className="stat-title">Total API Calls</div>
+                <div className="stat-value text-primary">-</div>
+                <div className="stat-desc">This month</div>
+              </div>
+              <div className="stat bg-base-200 rounded-lg">
+                <div className="stat-title">Credits Used</div>
+                <div className="stat-value text-secondary">-</div>
+                <div className="stat-desc">This month</div>
+              </div>
+              <div className="stat bg-base-200 rounded-lg">
+                <div className="stat-title">Avg Response Time</div>
+                <div className="stat-value text-accent">-</div>
+                <div className="stat-desc">Last 30 days</div>
+              </div>
+            </div>
+            <div className="alert alert-info mt-6">
+              <Activity className="h-6 w-6" />
+              <div>
+                <h4 className="font-bold">Pro Tip</h4>
+                <p className="text-sm">Check your dashboard for detailed usage analytics including endpoint breakdown, error rates, and response times.</p>
               </div>
             </div>
           </div>
