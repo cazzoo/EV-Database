@@ -686,10 +686,12 @@ export default function StatsPage() {
                           </div>
                           {milestone.achieved ? (
                             <span className="badge badge-success">Achieved</span>
-                          ) : (
+                          ) : milestone.progress !== undefined && milestone.target !== undefined ? (
                             <span className="badge badge-ghost">
                               {Math.round((milestone.progress / milestone.target) * 100)}%
                             </span>
+                          ) : (
+                            <span className="badge badge-ghost">In Progress</span>
                           )}
                         </div>
                       ))}
