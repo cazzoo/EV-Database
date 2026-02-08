@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import UserStats from "@/components/gamification/UserStats";
 import Achievements from "@/components/gamification/Achievements";
 import {
@@ -11,6 +13,11 @@ import {
   CreditCard,
   History,
   Bell,
+  User,
+  BarChart3,
+  FileText,
+  Award,
+  Activity,
 } from "lucide-react";
 
 // Mock data for demonstration
@@ -106,24 +113,52 @@ export default function DashboardPage() {
                     <Zap className="h-4 w-4 mr-2" />
                     Overview
                   </button>
-                  <button
-                    className={`btn btn-block ${
+                  <a
+                    href="/contributions/history"
+                    className={`btn btn-block justify-start ${
                       activeTab === "contributions" ? "btn-primary" : "btn-ghost"
                     }`}
-                    onClick={() => setActiveTab("contributions")}
                   >
                     <Car className="h-4 w-4 mr-2" />
                     Contributions
-                  </button>
-                  <button
-                    className={`btn btn-block ${
+                  </a>
+                  <a
+                    href="/rewards"
+                    className={`btn btn-block justify-start ${
                       activeTab === "achievements" ? "btn-primary" : "btn-ghost"
                     }`}
-                    onClick={() => setActiveTab("achievements")}
                   >
                     <Trophy className="h-4 w-4 mr-2" />
-                    Achievements
-                  </button>
+                    Rewards
+                  </a>
+                  <a
+                    href="/stats"
+                    className="btn btn-block justify-start btn-ghost"
+                  >
+                    <BarChart3 className="h-4 w-4 mr-2" />
+                    Statistics
+                  </a>
+                  <a
+                    href="/billing"
+                    className="btn btn-block justify-start btn-ghost"
+                  >
+                    <CreditCard className="h-4 w-4 mr-2" />
+                    Billing
+                  </a>
+                  <a
+                    href="/api-usage"
+                    className="btn btn-block justify-start btn-ghost"
+                  >
+                    <Activity className="h-4 w-4 mr-2" />
+                    API Usage
+                  </a>
+                  <a
+                    href="/profile"
+                    className="btn btn-block justify-start btn-ghost"
+                  >
+                    <User className="h-4 w-4 mr-2" />
+                    Profile
+                  </a>
                   <button
                     className={`btn btn-block ${
                       activeTab === "settings" ? "btn-primary" : "btn-ghost"
@@ -131,7 +166,7 @@ export default function DashboardPage() {
                     onClick={() => setActiveTab("settings")}
                   >
                     <Settings className="h-4 w-4 mr-2" />
-                    Settings
+                    Quick Settings
                   </button>
                 </nav>
               </div>
@@ -145,11 +180,14 @@ export default function DashboardPage() {
                   <a href="/contribute" className="btn btn-primary btn-block">
                     Contribute
                   </a>
-                  <a href="/leaderboard" className="btn btn-ghost btn-block">
-                    View Leaderboard
+                  <a href="/stats" className="btn btn-ghost btn-block">
+                    View Statistics
                   </a>
-                  <a href="/credits" className="btn btn-ghost btn-block">
+                  <a href="/billing" className="btn btn-ghost btn-block">
                     Buy Credits
+                  </a>
+                  <a href="/api-usage" className="btn btn-ghost btn-block">
+                    API Usage
                   </a>
                 </div>
               </div>
@@ -211,7 +249,7 @@ export default function DashboardPage() {
                         ))}
                       </div>
                       <a
-                        href="/dashboard/contributions"
+                        href="/contributions/history"
                         className="btn btn-ghost btn-sm btn-block mt-4"
                       >
                         View All Contributions
