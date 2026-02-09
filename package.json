@@ -3,9 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "db:init": "tsx scripts/init-db.ts",
+    "dev": "npm run db:init && next dev",
     "build": "prisma generate && next build",
-    "start": "next start",
+    "start": "npm run db:init && next start",
     "lint": "eslint",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
@@ -19,6 +20,7 @@
     "@auth/prisma-adapter": "^2.7.4",
     "@prisma/client": "^6.4.1",
     "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^12.6.2",
     "daisyui": "^5.0.9",
     "date-fns": "^4.1.0",
     "framer-motion": "^12.4.7",
@@ -32,6 +34,7 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.3",
     "@types/bcryptjs": "^2.4.6",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^24.10.2",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
