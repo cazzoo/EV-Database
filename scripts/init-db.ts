@@ -10,6 +10,10 @@
 import { execSync } from "child_process";
 import { existsSync, mkdirSync } from "fs";
 import path from "path";
+import dotenv from "dotenv";
+
+// Load environment variables from .env file
+dotenv.config();
 
 const DB_FILE = "ev-database.db";
 
