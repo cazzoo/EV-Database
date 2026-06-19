@@ -4,113 +4,69 @@ import {
   Car,
   Battery,
   Zap,
-  DollarSign,
-  Star,
   Edit,
-  Flag,
   ChevronLeft,
   ChevronRight,
   Heart,
   Share2,
+  Flag,
+  Star,
+  Gauge,
 } from "lucide-react";
-
-const VEHICLES: Record<string, {
-  id: string;
-  make: string;
-  model: string;
-  year: number;
-  price: number;
-  range: number;
-  battery: number;
-  acceleration: number;
-  topSpeed: number;
-  horsepower: number;
-  drivetrain: string;
-  seats: number;
-  cargo: number;
-  rating: number;
-  reviews: number;
-  description: string;
-  features: string[];
-  image: string;
-}> = {
-  "tesla-model-3-long-range": {
-    id: "tesla-model-3-long-range",
-    make: "Tesla",
-    model: "Model 3 Long Range",
-    year: 2024,
-    price: 47740,
-    range: 333,
-    battery: 82,
-    acceleration: 4.2,
-    topSpeed: 145,
-    horsepower: 425,
-    drivetrain: "Dual Motor AWD",
-    seats: 5,
-    cargo: 23,
-    rating: 4.5,
-    reviews: 2847,
-    description:
-      "The Tesla Model 3 Long Range offers an impressive 333 miles of range with dual motor all-wheel drive. Experience instant torque, advanced autopilot capabilities, and a minimalist interior with a 15.4-inch touchscreen.",
-    features: [
-      "Dual Motor All-Wheel Drive",
-      "15.4-inch Touchscreen",
-      "Autopilot Ready",
-      "Premium Audio with 13 Speakers",
-      "Heated Seats & Steering Wheel",
-      "Glass Roof",
-      "Wireless Phone Charging",
-      "Keyless Entry with Phone",
-    ],
-    image: "/images/tesla-model-3.jpg",
-  },
-  "ford-mustang-mach-e-gt": {
-    id: "ford-mustang-mach-e-gt",
-    make: "Ford",
-    model: "Mustang Mach-E GT",
-    year: 2024,
-    price: 59995,
-    range: 270,
-    battery: 91,
-    acceleration: 3.8,
-    topSpeed: 130,
-    horsepower: 480,
-    drivetrain: "Dual Motor AWD",
-    seats: 5,
-    cargo: 59,
-    rating: 4.3,
-    reviews: 1234,
-    description:
-      "The Mustang Mach-E GT delivers thrilling performance with 480 horsepower and 600 lb-ft of torque. Experience the heritage of Mustang in an all-electric package with aggressive styling and track-inspired dynamics.",
-    features: [
-      "Dual Motor Performance AWD",
-      "MagneRide Damping System",
-      "Brembo Brakes",
-      "20-inch Cast Aluminum Wheels",
-      "Performance Seats",
-      "15.5-inch Touchscreen with Sync 4A",
-      "Ford Co-Pilot360 Active 2.0",
-      "Hands-Free Driving Capability",
-    ],
-    image: "/images/mustang-mach-e.jpg",
-  },
-};
+import { prisma } from "@/lib/prisma";
+import { vehicleSlug, voteScore } from "@/lib/vehicles";
+import { formatCurrency, formatNumber, formatDate, timeAgo } from "@/lib/format";
+import VehicleReviewForm from "@/components/vehicles/VehicleReviewForm";
 
 interface VehiclePageProps {
   params: Promise<{ slug: string }>;
 }
 
+export async function generateStaticParams() {
+  const vehicles = await prisma.electricVehicle.findMany({
+    select: { make: true, model: true },
+  });
+  return vehicles.map((v) => ({ slug: vehicleSlug(v) }));
+}
+
+async function getVehicleBySlug(slug: string) {
+  const candidates = await prisma.electricVehicle.findMany({
+    select: { id: true, make: true, model: true },
+  });
+  const match = candidates.find((v) => vehicleSlug(v) === slug);
+  if (!match) return null;
+
+  return prisma.electricVehicle.findUnique({
+    where: { id: match.id },
+    include: {
+      charging: true,
+      performance: true,
+      comments: {
+        include: {
+          user: { select: { id: true, name: true, image: true } },
+        },
+        orderBy: { createdAt: "desc" },
+      },
+      votes: { select: { value: true } },
+    },
+  });
+}
+
 export default async function VehiclePage({ params }: VehiclePageProps) {
   const { slug } = await params;
-  const vehicle = VEHICLES[slug];
+  const vehicle = await getVehicleBySlug(slug);
 
   if (!vehicle) {
     notFound();
   }
 
-  const relatedVehicles = Object.values(VEHICLES).filter(
-    (v) => v.id !== vehicle.id
-  );
+  const score = voteScore(vehicle.votes);
+  const related = await prisma.electricVehicle.findMany({
+    where: { id: { not: vehicle.id } },
+    take: 3,
+    orderBy: { votes: { _count: "desc" } },
+    include: { votes: { select: { value: true } } },
+  });
 
   return (
     <div className="min-h-screen bg-base-200">
@@ -129,47 +85,37 @@ export default async function VehiclePage({ params }: VehiclePageProps) {
                       {vehicle.make} {vehicle.model}
                     </h1>
                     <p className="text-lg text-base-content/70 mt-1">
-                      {vehicle.year} • {vehicle.drivetrain}
+                      {vehicle.year}
+                      {vehicle.trim ? ` • ${vehicle.trim}` : ""}
+                      {vehicle.performance?.drivetrain ? ` • ${vehicle.performance.drivetrain}` : ""}
                     </p>
                   </div>
                   <div className="flex gap-2">
-                    <button className="btn btn-ghost btn-circle">
+                    <button className="btn btn-ghost btn-circle" title="Save">
                       <Heart className="h-5 w-5" />
                     </button>
-                    <button className="btn btn-ghost btn-circle">
+                    <button
+                      className="btn btn-ghost btn-circle"
+                      title="Share"
+                    >
                       <Share2 className="h-5 w-5" />
                     </button>
-                    <button className="btn btn-ghost btn-circle">
+                    <Link href="/contribute" className="btn btn-ghost btn-circle" title="Report issue">
                       <Flag className="h-5 w-5" />
-                    </button>
+                    </Link>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2 mt-4">
-                  <div className="flex items-center gap-1">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <Star
-                        key={star}
-                        className={`h-5 w-5 ${
-                          star <= Math.round(vehicle.rating)
-                            ? "text-yellow-400 fill-current"
-                            : "text-base-300"
-                        }`}
-                      />
-                    ))}
-                  </div>
-                  <span className="font-semibold">{vehicle.rating}</span>
+                  <Star className="h-5 w-5 text-yellow-400 fill-current" />
+                  <span className="font-semibold">{formatNumber(score)}</span>
                   <span className="text-base-content/70">
-                    ({vehicle.reviews.toLocaleString()} reviews)
+                    community votes ({vehicle.votes.length})
                   </span>
                 </div>
 
                 <div className="text-3xl font-bold text-primary mt-4">
-                  {vehicle.price.toLocaleString("en-US", {
-                    style: "currency",
-                    currency: "USD",
-                    maximumFractionDigits: 0,
-                  })}
+                  {vehicle.price ? formatCurrency(vehicle.price) : "Price N/A"}
                 </div>
               </div>
             </div>
@@ -182,7 +128,6 @@ export default async function VehiclePage({ params }: VehiclePageProps) {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Specifications */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Key Stats */}
             <div className="card bg-base-100 shadow-lg">
               <div className="card-body">
                 <h2 className="card-title">
@@ -193,10 +138,10 @@ export default async function VehiclePage({ params }: VehiclePageProps) {
                   <div className="stat bg-base-200 rounded-lg p-4">
                     <div className="stat-title">
                       <Zap className="h-4 w-4 inline mr-1" />
-                      Range (EPA)
+                      Range (WLTP)
                     </div>
                     <div className="stat-value text-primary text-2xl">
-                      {vehicle.range} mi
+                      {formatNumber(vehicle.range)} km
                     </div>
                   </div>
                   <div className="stat bg-base-200 rounded-lg p-4">
@@ -210,84 +155,101 @@ export default async function VehiclePage({ params }: VehiclePageProps) {
                   </div>
                   <div className="stat bg-base-200 rounded-lg p-4">
                     <div className="stat-title">
-                      <span className="text-xl font-bold text-accent">0-60</span>
-                      0-60 mph
+                      <Gauge className="h-4 w-4 inline mr-1" />
+                      0-100 km/h
                     </div>
                     <div className="stat-value text-accent text-2xl">
-                      {vehicle.acceleration}s
+                      {vehicle.performance ? `${vehicle.performance.acceleration}s` : "-"}
                     </div>
                   </div>
                   <div className="stat bg-base-200 rounded-lg p-4">
                     <div className="stat-title">Top Speed</div>
-                    <div className="stat-value text-2xl">{vehicle.topSpeed} mph</div>
+                    <div className="stat-value text-2xl">
+                      {vehicle.performance ? `${vehicle.performance.topSpeed} km/h` : "-"}
+                    </div>
                   </div>
                   <div className="stat bg-base-200 rounded-lg p-4">
-                    <div className="stat-title">Horsepower</div>
-                    <div className="stat-value text-2xl">{vehicle.horsepower}</div>
+                    <div className="stat-title">Efficiency</div>
+                    <div className="stat-value text-2xl">{vehicle.efficiency} Wh/km</div>
                   </div>
                   <div className="stat bg-base-200 rounded-lg p-4">
-                    <div className="stat-title">Cargo Space</div>
-                    <div className="stat-value text-2xl">{vehicle.cargo} ft³</div>
+                    <div className="stat-title">DC Fast Charge</div>
+                    <div className="stat-value text-2xl">
+                      {vehicle.charging ? `${vehicle.charging.dcPower} kW` : "-"}
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Description */}
-            <div className="card bg-base-100 shadow-lg">
-              <div className="card-body">
-                <h2 className="card-title">
-                  <Car className="h-6 w-6 text-primary" />
-                  Overview
-                </h2>
-                <p className="text-base-content/80 mt-4 leading-relaxed">
-                  {vehicle.description}
-                </p>
-              </div>
-            </div>
-
-            {/* Features */}
+            {/* Charging & Drivetrain */}
             <div className="card bg-base-100 shadow-lg">
               <div className="card-body">
                 <h2 className="card-title">
                   <Zap className="h-6 w-6 text-primary" />
-                  Features & Equipment
+                  Charging & Performance
                 </h2>
-                <ul className="list-none mt-4 grid grid-cols-1 md:grid-cols-2 gap-2">
-                  {vehicle.features.map((feature, index) => (
-                    <li key={index} className="flex items-center gap-2">
-                      <span className="text-primary">✓</span>
-                      {feature}
-                    </li>
-                  ))}
-                </ul>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                  <div className="flex justify-between p-3 bg-base-200 rounded-lg">
+                    <span className="text-base-content/70">AC Charging</span>
+                    <span className="font-semibold">
+                      {vehicle.charging ? `${vehicle.charging.acPower} kW` : "-"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between p-3 bg-base-200 rounded-lg">
+                    <span className="text-base-content/70">DC Fast Charging</span>
+                    <span className="font-semibold">
+                      {vehicle.charging ? `${vehicle.charging.dcPower} kW` : "-"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between p-3 bg-base-200 rounded-lg">
+                    <span className="text-base-content/70">Drivetrain</span>
+                    <span className="font-semibold">
+                      {vehicle.performance?.drivetrain || "-"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between p-3 bg-base-200 rounded-lg">
+                    <span className="text-base-content/70">Acceleration</span>
+                    <span className="font-semibold">
+                      {vehicle.performance ? `${vehicle.performance.acceleration}s (0-100)` : "-"}
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* Community Rating */}
+            {/* Community Reviews */}
             <div className="card bg-base-100 shadow-lg">
               <div className="card-body">
                 <h2 className="card-title">
                   <Star className="h-6 w-6 text-primary" />
-                  Community Ratings
+                  Community Reviews ({vehicle.comments.length})
                 </h2>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-                  <div className="text-center">
-                    <div className="text-4xl font-bold text-primary">4.5</div>
-                    <div className="text-sm text-base-content/70">Overall</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-4xl font-bold text-secondary">4.6</div>
-                    <div className="text-sm text-base-content/70">Range</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-4xl font-bold text-accent">4.4</div>
-                    <div className="text-sm text-base-content/70">Performance</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-4xl font-bold text-info">4.3</div>
-                    <div className="text-sm text-base-content/70">Comfort</div>
-                  </div>
+                <VehicleReviewForm vehicleId={vehicle.id} />
+                <div className="mt-6 space-y-4">
+                  {vehicle.comments.length === 0 && (
+                    <p className="text-base-content/60 text-center py-6">
+                      No reviews yet. Be the first to share your thoughts!
+                    </p>
+                  )}
+                  {vehicle.comments.map((comment) => (
+                    <div key={comment.id} className="bg-base-200 rounded-lg p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="avatar placeholder">
+                          <div className="bg-neutral text-neutral-content rounded-full w-8 h-8">
+                            <span className="text-xs">
+                              {(comment.user.name || "?").charAt(0).toUpperCase()}
+                            </span>
+                          </div>
+                        </div>
+                        <span className="font-semibold">{comment.user.name}</span>
+                        <span className="text-xs text-base-content/50">
+                          {timeAgo(comment.createdAt)}
+                        </span>
+                      </div>
+                      <p className="text-base-content/80">{comment.content}</p>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
@@ -295,7 +257,6 @@ export default async function VehiclePage({ params }: VehiclePageProps) {
 
           {/* Sidebar */}
           <div className="space-y-6">
-            {/* Contribution Card */}
             <div className="card bg-primary text-primary-content shadow-lg">
               <div className="card-body">
                 <h2 className="card-title">
@@ -307,14 +268,16 @@ export default async function VehiclePage({ params }: VehiclePageProps) {
                   community by contributing!
                 </p>
                 <div className="card-actions justify-end mt-4">
-                  <Link href="/contribute" className="btn btn-secondary">
+                  <Link
+                    href={`/contribute?vehicleId=${vehicle.id}&type=UPDATE_SPECS`}
+                    className="btn btn-secondary"
+                  >
                     Edit This Vehicle
                   </Link>
                 </div>
               </div>
             </div>
 
-            {/* Quick Stats */}
             <div className="card bg-base-100 shadow-lg">
               <div className="card-body">
                 <h3 className="font-bold text-lg mb-4">Quick Stats</h3>
@@ -322,30 +285,31 @@ export default async function VehiclePage({ params }: VehiclePageProps) {
                   <div className="flex justify-between">
                     <span className="text-base-content/70">Base Price</span>
                     <span className="font-semibold">
-                      {vehicle.price.toLocaleString("en-US", {
-                        style: "currency",
-                        currency: "USD",
-                        maximumFractionDigits: 0,
-                      })}
+                      {vehicle.price ? formatCurrency(vehicle.price) : "N/A"}
                     </span>
                   </div>
                   <div className="flex justify-between">
+                    <span className="text-base-content/70">Battery</span>
+                    <span className="font-semibold">{vehicle.battery} kWh</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-base-content/70">Range</span>
+                    <span className="font-semibold">{formatNumber(vehicle.range)} km</span>
+                  </div>
+                  <div className="flex justify-between">
                     <span className="text-base-content/70">Drivetrain</span>
-                    <span className="font-semibold">{vehicle.drivetrain}</span>
+                    <span className="font-semibold">
+                      {vehicle.performance?.drivetrain || "-"}
+                    </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-base-content/70">Seating</span>
-                    <span className="font-semibold">{vehicle.seats} passengers</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-base-content/70">Cargo</span>
-                    <span className="font-semibold">{vehicle.cargo} ft³</span>
+                    <span className="text-base-content/70">Added</span>
+                    <span className="font-semibold">{formatDate(vehicle.createdAt)}</span>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Navigation */}
             <div className="card bg-base-100 shadow-lg">
               <div className="card-body">
                 <h3 className="font-bold text-lg mb-4">Browse More</h3>
@@ -354,7 +318,7 @@ export default async function VehiclePage({ params }: VehiclePageProps) {
                     <ChevronLeft className="h-4 w-4" />
                     All Vehicles
                   </Link>
-                  <Link href="/compare" className="btn btn-ghost">
+                  <Link href="/vehicles" className="btn btn-ghost">
                     Compare
                     <ChevronRight className="h-4 w-4" />
                   </Link>
@@ -365,42 +329,36 @@ export default async function VehiclePage({ params }: VehiclePageProps) {
         </div>
 
         {/* Related Vehicles */}
-        <div className="mt-12">
-          <h2 className="text-2xl font-bold mb-6">Similar Vehicles</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {relatedVehicles.map((v) => (
-              <Link
-                key={v.id}
-                href={`/vehicles/${v.id}`}
-                className="card bg-base-100 shadow-lg hover:shadow-xl transition-shadow"
-              >
-                <figure className="h-40 bg-base-200 flex items-center justify-center">
-                  <Car className="h-20 w-20 text-base-content/30" />
-                </figure>
-                <div className="card-body">
-                  <h3 className="card-title text-lg">
-                    {v.make} {v.model}
-                  </h3>
-                  <p className="text-primary font-bold">
-                    {v.price.toLocaleString("en-US", {
-                      style: "currency",
-                      currency: "USD",
-                      maximumFractionDigits: 0,
-                    })}
-                  </p>
-                  <div className="text-sm text-base-content/70">
-                    {v.range} mi range • {v.acceleration}s 0-60
+        {related.length > 0 && (
+          <div className="mt-12">
+            <h2 className="text-2xl font-bold mb-6">Similar Vehicles</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {related.map((v) => (
+                <Link
+                  key={v.id}
+                  href={`/vehicles/${vehicleSlug(v)}`}
+                  className="card bg-base-100 shadow-lg hover:shadow-xl transition-shadow"
+                >
+                  <figure className="h-40 bg-base-200 flex items-center justify-center">
+                    <Car className="h-20 w-20 text-base-content/30" />
+                  </figure>
+                  <div className="card-body">
+                    <h3 className="card-title text-lg">
+                      {v.make} {v.model}
+                    </h3>
+                    <p className="text-primary font-bold">
+                      {v.price ? formatCurrency(v.price) : "N/A"}
+                    </p>
+                    <div className="text-sm text-base-content/70">
+                      {formatNumber(v.range)} km range • {voteScore(v.votes)} votes
+                    </div>
                   </div>
-                </div>
-              </Link>
-            ))}
+                </Link>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
-}
-
-export function generateStaticParams() {
-  return Object.keys(VEHICLES).map((slug) => ({ slug }));
 }

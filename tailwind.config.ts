@@ -1,5 +1,5 @@
 import type { Config } from "tailwindcss";
-// @ts-ignore
+// @ts-expect-error - daisyui ships without type declarations
 import daisyui from "daisyui";
 
 export default {

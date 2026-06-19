@@ -1,17 +1,39 @@
-import { Suspense } from "react";
 import Link from "next/link";
 import {
   Car,
-  Zap,
   Trophy,
   Users,
   ChevronRight,
   ArrowRight,
-  Star,
   CreditCard,
 } from "lucide-react";
+import { prisma } from "@/lib/prisma";
+import { vehicleSlug, voteScore } from "@/lib/vehicles";
+import { formatNumber, formatCurrency } from "@/lib/format";
+import { getLevel } from "@/lib/gamification";
 
-export default function Home() {
+export default async function Home() {
+  const [vehicles, contributors, totalVehicles, totalUsers] = await Promise.all([
+    prisma.electricVehicle.findMany({
+      take: 3,
+      orderBy: { votes: { _count: "desc" } },
+      include: { votes: { select: { value: true } } },
+    }),
+    prisma.user.findMany({
+      where: { NOT: { role: "ADMIN" } },
+      orderBy: { xp: "desc" },
+      take: 5,
+      select: {
+        id: true,
+        name: true,
+        xp: true,
+        contributions: { where: { status: "APPROVED" }, select: { id: true } },
+      },
+    }),
+    prisma.electricVehicle.count(),
+    prisma.user.count({ where: { NOT: { role: "ADMIN" } } }),
+  ]);
+
   return (
     <div className="min-h-screen bg-base-200">
       {/* Hero Section */}
@@ -40,6 +62,28 @@ export default function Home() {
         </div>
       </div>
 
+      {/* Stats Strip */}
+      <div className="py-8 bg-base-100 border-b border-base-300">
+        <div className="container mx-auto px-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+          <div>
+            <div className="text-3xl font-bold text-primary">{formatNumber(totalVehicles)}</div>
+            <div className="text-sm text-base-content/60">Vehicles</div>
+          </div>
+          <div>
+            <div className="text-3xl font-bold text-primary">{formatNumber(totalUsers)}</div>
+            <div className="text-sm text-base-content/60">Contributors</div>
+          </div>
+          <div>
+            <div className="text-3xl font-bold text-primary">6</div>
+            <div className="text-sm text-base-content/60">Merit Roles</div>
+          </div>
+          <div>
+            <div className="text-3xl font-bold text-primary">$1 = 100</div>
+            <div className="text-sm text-base-content/60">Credits</div>
+          </div>
+        </div>
+      </div>
+
       {/* Features Section */}
       <div className="py-16 bg-base-100">
         <div className="container mx-auto px-4">
@@ -53,7 +97,7 @@ export default function Home() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             <div className="card bg-base-200 shadow-lg hover:shadow-xl transition-shadow">
               <div className="card-body text-center">
-                <div className="w-16 h-16 bg-primary text-primary-content rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-4">
+                <div className="w-16 h-16 bg-primary text-primary-content rounded-full flex items-center justify-center mx-auto mb-4">
                   <Car className="h-8 w-8" />
                 </div>
                 <h3 className="card-title justify-center mb-2">Comprehensive Database</h3>
@@ -66,7 +110,7 @@ export default function Home() {
 
             <div className="card bg-base-200 shadow-lg hover:shadow-xl transition-shadow">
               <div className="card-body text-center">
-                <div className="w-16 h-16 bg-secondary text-secondary-content rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-4">
+                <div className="w-16 h-16 bg-secondary text-secondary-content rounded-full flex items-center justify-center mx-auto mb-4">
                   <Trophy className="h-8 w-8" />
                 </div>
                 <h3 className="card-title justify-center mb-2">Gamification</h3>
@@ -79,7 +123,7 @@ export default function Home() {
 
             <div className="card bg-base-200 shadow-lg hover:shadow-xl transition-shadow">
               <div className="card-body text-center">
-                <div className="w-16 h-16 bg-accent text-accent-content rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-4">
+                <div className="w-16 h-16 bg-accent text-accent-content rounded-full flex items-center justify-center mx-auto mb-4">
                   <CreditCard className="h-8 w-8" />
                 </div>
                 <h3 className="card-title justify-center mb-2">Virtual Credits</h3>
@@ -92,7 +136,7 @@ export default function Home() {
 
             <div className="card bg-base-200 shadow-lg hover:shadow-xl transition-shadow">
               <div className="card-body text-center">
-                <div className="w-16 h-16 bg-info text-info-content rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-4">
+                <div className="w-16 h-16 bg-info text-info-content rounded-full flex items-center justify-center mx-auto mb-4">
                   <Users className="h-8 w-8" />
                 </div>
                 <h3 className="card-title justify-center mb-2">Community First</h3>
@@ -117,29 +161,47 @@ export default function Home() {
             </Link>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[1, 2, 3].map((item) => (
-              <div key={item} className="card bg-base-100 shadow-lg hover:shadow-xl transition-shadow">
-                <figure className="h-48 bg-base-200 flex items-center justify-center">
-                  <Car className="h-24 w-24 text-base-content/30" />
-                </figure>
-                <div className="card-body">
-                  <div className="flex justify-between items-start">
-                    <h3 className="card-title">Tesla Model 3</h3>
-                    <div className="badge badge-primary">4.8⭐</div>
-                  </div>
-                  <p className="text-base-content/70">
-                    The best-selling EV with industry-leading range and performance.
-                  </p>
-                  <div className="card-actions justify-end">
-                    <Link href="/vehicles/tesla-model-3" className="btn btn-primary">
-                      View Details
-                    </Link>
+          {vehicles.length === 0 ? (
+            <div className="card bg-base-100 shadow">
+              <div className="card-body items-center text-center">
+                <Car className="h-12 w-12 text-base-content/30" />
+                <p className="text-base-content/60">No vehicles yet. Be the first to add one!</p>
+                <Link href="/contribute" className="btn btn-primary">Add a Vehicle</Link>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {vehicles.map((vehicle) => (
+                <div key={vehicle.id} className="card bg-base-100 shadow-lg hover:shadow-xl transition-shadow">
+                  <figure className="h-48 bg-base-200 flex items-center justify-center">
+                    <Car className="h-24 w-24 text-base-content/30" />
+                  </figure>
+                  <div className="card-body">
+                    <div className="flex justify-between items-start">
+                      <h3 className="card-title">
+                        {vehicle.make} {vehicle.model}
+                      </h3>
+                      <div className="badge badge-primary">
+                        {voteScore(vehicle.votes)} votes
+                      </div>
+                    </div>
+                    <div className="flex gap-4 text-sm text-base-content/70">
+                      <span>{vehicle.range} km range</span>
+                      <span>{vehicle.battery} kWh</span>
+                    </div>
+                    <p className="font-semibold text-primary">
+                      {vehicle.price ? formatCurrency(vehicle.price) : "Price N/A"}
+                    </p>
+                    <div className="card-actions justify-end">
+                      <Link href={`/vehicles/${vehicleSlug(vehicle)}`} className="btn btn-primary">
+                        View Details
+                      </Link>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -168,41 +230,45 @@ export default function Home() {
                     </tr>
                   </thead>
                   <tbody>
-                    {[
-                      { rank: 1, name: "EVEnthusiast", contributions: 156, xp: 2450, level: "Expert" },
-                      { rank: 2, name: "TeslaFan42", contributions: 128, xp: 2100, level: "Contributor" },
-                      { rank: 3, name: "GreenMachine", contributions: 112, xp: 1890, level: "Contributor" },
-                      { rank: 4, name: "ChargeMaster", contributions: 98, xp: 1650, level: "Contributor" },
-                      { rank: 5, name: "ElectronX", contributions: 87, xp: 1420, level: "Contributor" },
-                    ].map((user) => (
-                      <tr key={user.rank}>
-                        <td className="font-bold text-lg">
-                          {user.rank === 1 && "🥇"}
-                          {user.rank === 2 && "🥈"}
-                          {user.rank === 3 && "🥉"}
-                          {user.rank > 3 && `#${user.rank}`}
-                        </td>
-                        <td>
-                          <div className="flex items-center gap-2">
-                            <div className="avatar placeholder">
-                              <div className="bg-primary text-primary-content rounded-full w-8 h-8">
-                                <span className="text-xs">
-                                  {user.name.charAt(0)}
-                                </span>
-                              </div>
-                            </div>
-                            <span className="font-medium">{user.name}</span>
-                          </div>
-                        </td>
-                        <td>{user.contributions}</td>
-                        <td>{user.xp.toLocaleString()}</td>
-                        <td>
-                          <span className="badge badge-primary badge-sm">
-                            {user.level}
-                          </span>
+                    {contributors.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="text-center text-base-content/60 py-8">
+                          No contributors yet.
                         </td>
                       </tr>
-                    ))}
+                    )}
+                    {contributors.map((user, index) => {
+                      const level = getLevel(user.xp);
+                      return (
+                        <tr key={user.id}>
+                          <td className="font-bold text-lg">
+                            {index === 0 && "🥇"}
+                            {index === 1 && "🥈"}
+                            {index === 2 && "🥉"}
+                            {index > 2 && `#${index + 1}`}
+                          </td>
+                          <td>
+                            <div className="flex items-center gap-2">
+                              <div className="avatar placeholder">
+                                <div className="bg-primary text-primary-content rounded-full w-8 h-8">
+                                  <span className="text-xs">
+                                    {(user.name || "?").charAt(0).toUpperCase()}
+                                  </span>
+                                </div>
+                              </div>
+                              <span className="font-medium">{user.name}</span>
+                            </div>
+                          </td>
+                          <td>{formatNumber(user.contributions.length)}</td>
+                          <td>{formatNumber(user.xp)}</td>
+                          <td>
+                            <span className="badge badge-primary badge-sm">
+                              {level.current.name}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

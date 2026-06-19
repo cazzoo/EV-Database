@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { 
   Car, 
@@ -17,13 +18,22 @@ import {
   FileText,
   Award,
   Activity,
-  Settings,
   LogOut,
 } from "lucide-react";
 
 export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const { data: session, status } = useSession();
+  const router = useRouter();
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      router.push(`/vehicles?search=${encodeURIComponent(searchQuery.trim())}`);
+      setSearchQuery("");
+    }
+  };
 
   return (
     <div className="navbar bg-base-100 shadow-lg sticky top-0 z-50">
@@ -75,11 +85,18 @@ export default function Navbar() {
 
       <div className="navbar-end gap-2">
         <div className="form-control hidden sm:block">
-          <input
-            type="text"
-            placeholder="Search vehicles..."
-            className="input input-bordered input-sm w-36 md:w-64"
-          />
+          <form onSubmit={handleSearch} className="relative">
+            <input
+              type="text"
+              placeholder="Search vehicles..."
+              className="input input-bordered input-sm w-36 md:w-64 pr-8"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            <button type="submit" className="absolute right-2 top-1/2 -translate-y-1/2">
+              <Search className="h-4 w-4 text-base-content/50" />
+            </button>
+          </form>
         </div>
         
         {status === "loading" ? (

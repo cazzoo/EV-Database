@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { CreditCard, Zap, DollarSign, Shield, Badge, CheckCircle, Activity, TrendingUp, Database } from "lucide-react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { CreditCard, Zap, Shield, Badge, DollarSign, CheckCircle, Activity, TrendingUp, Database } from "lucide-react";
 
 const CREDIT_PACKAGES = [
   {
@@ -118,16 +120,48 @@ const USAGE_EXAMPLES = [
 ];
 
 export default function CreditsPage() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
   const [selectedPackage, setSelectedPackage] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<"card" | "paypal">("card");
+  const [processing, setProcessing] = useState(false);
+  const [success, setSuccess] = useState<{ credits: number } | null>(null);
+  const [error, setError] = useState("");
 
   const handlePackageSelect = (packageId: string) => {
     setSelectedPackage(packageId);
+    setSuccess(null);
+    setError("");
   };
 
-  const handleCheckout = () => {
-    // In a real app, this would redirect to payment
-    alert("Redirecting to payment...");
+  const handleCheckout = async () => {
+    if (status === "unauthenticated") {
+      router.push("/auth/login");
+      return;
+    }
+    if (!session?.user?.id || !selectedPackage) return;
+    const pkg = CREDIT_PACKAGES.find((p) => p.id === selectedPackage);
+    if (!pkg) return;
+
+    setProcessing(true);
+    setError("");
+    const res = await fetch("/api/purchases", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId: session.user.id,
+        amount: pkg.credits,
+        description: `${pkg.name} - ${pkg.credits} Credits`,
+        immediate: true,
+      }),
+    });
+    setProcessing(false);
+    if (res.ok) {
+      setSuccess({ credits: pkg.credits });
+    } else {
+      const json = await res.json().catch(() => ({}));
+      setError(json.error || "Purchase failed");
+    }
   };
 
   return (
@@ -430,6 +464,22 @@ export default function CreditsPage() {
           <div className="card bg-base-100 shadow-lg">
             <div className="card-body">
               <h2 className="card-title">Checkout</h2>
+
+              {success ? (
+                <div className="text-center py-10">
+                  <div className="text-6xl mb-4">🎉</div>
+                  <h3 className="text-2xl font-bold">Purchase Successful!</h3>
+                  <p className="text-base-content/70 mt-2">
+                    {success.credits.toLocaleString()} credits have been added to your account.
+                  </p>
+                  <div className="card-actions justify-center mt-6">
+                    <button className="btn btn-primary" onClick={() => { setSelectedPackage(null); setSuccess(null); }}>
+                      Buy More
+                    </button>
+                    <a href="/dashboard" className="btn btn-ghost">Go to Dashboard</a>
+                  </div>
+                </div>
+              ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {/* Order Summary */}
                 <div>
@@ -537,15 +587,23 @@ export default function CreditsPage() {
                       </div>
                     )}
 
+                    {error && (
+                      <div className="alert alert-error mt-4">
+                        <span>{error}</span>
+                      </div>
+                    )}
+
                     <button
                       className="btn btn-primary btn-block mt-6"
                       onClick={handleCheckout}
+                      disabled={processing}
                     >
-                      Complete Purchase
+                      {processing ? <span className="loading loading-spinner loading-sm"></span> : "Complete Purchase"}
                     </button>
                   </div>
                 </div>
               </div>
+              )}
             </div>
           </div>
         )}

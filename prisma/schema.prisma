@@ -26,6 +26,14 @@ model User {
   streak        Int       @default(0)
   lastActiveAt  DateTime?
 
+  // Profile extras
+  bio           String?
+  location      String?
+  website       String?
+
+  // Notification preferences stored as JSON string
+  notifications String?
+
   // Role system (merit-based)
   role          Role      @default(NEWCOMER)
 
@@ -38,6 +46,7 @@ model User {
   votes         Vote[]
   apiKeys       ApiKey[]
   transactions  Transaction[]
+  paymentMethods PaymentMethod[]
   followers     Follow[]  @relation("following")
   following     Follow[]  @relation("follower")
   apiUsage      ApiUsage[]
@@ -234,6 +243,7 @@ model ApiKey {
   lastUsedAt  DateTime?
   expiresAt   DateTime?
   active      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
   userId      String
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
@@ -263,6 +273,20 @@ enum TransactionType {
   API_USAGE
   ACHIEVEMENT_REWARD
   LEVEL_UP_BONUS
+}
+
+model PaymentMethod {
+  id          String   @id @default(cuid())
+  userId      String
+  brand       String   // Visa, Mastercard, etc.
+  last4       String
+  expMonth    Int
+  expYear     Int
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 // API Usage Tracking - monitors API consumption per user

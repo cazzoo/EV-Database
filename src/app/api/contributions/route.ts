@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import {
+  calculateXPForContribution,
+  calculateCreditsForContribution,
+} from "@/lib/gamification";
 
 export async function GET(request: NextRequest) {
   try {
@@ -96,9 +100,14 @@ export async function POST(request: NextRequest) {
         content: data.content || "",
         userId: data.userId || "anonymous", // Should get from auth
         vehicleId: data.vehicleId,
-        status: "PENDING",
-        xpReward: 0,
-        creditsCost: 0,
+        status: data.status || "PENDING",
+        xpReward: calculateXPForContribution(data.type),
+        creditsCost: calculateCreditsForContribution(data.type),
+      },
+      include: {
+        vehicle: {
+          select: { id: true, make: true, model: true, year: true },
+        },
       },
     });
 

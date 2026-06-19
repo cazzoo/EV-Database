@@ -1,87 +1,111 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import UserStats from "@/components/gamification/UserStats";
 import Achievements from "@/components/gamification/Achievements";
 import {
   Car,
   Zap,
   Trophy,
-  Settings,
   CreditCard,
   History,
   Bell,
   User,
   BarChart3,
-  FileText,
-  Award,
   Activity,
+  Settings,
 } from "lucide-react";
+import { formatNumber, timeAgo } from "@/lib/format";
 
-// Mock data for demonstration
-const USER_STATS = {
-  username: "EVEnthusiast",
-  xp: 1560,
-  credits: 245,
-  contributions: 47,
-};
+interface StatsData {
+  user: {
+    name: string;
+    xp: number;
+    credits: number;
+    totalContributions: number;
+    streak: number;
+  };
+  contributions: {
+    id: string;
+    type: string;
+    status: string;
+    createdAt: string;
+    xpReward: number;
+    vehicle: { make: string; model: string } | null;
+  }[];
+}
 
-const USER_ACHIEVEMENTS = [
-  { id: "first_edit", unlockedAt: new Date() },
-  { id: "data_master", unlockedAt: new Date() },
-  { id: "quality_contributor", unlockedAt: new Date() },
-  { id: "streak_week", unlockedAt: new Date() },
-];
+interface CatalogAchievement {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  xpReward: number;
+  rarity?: string;
+}
 
-const RECENT_CONTRIBUTIONS = [
-  {
-    id: 1,
-    type: "add_vehicle",
-    title: "2024 Tesla Model 3 Long Range",
-    date: "2 hours ago",
-    status: "approved",
-    xp: 25,
-    credits: 5,
-  },
-  {
-    id: 2,
-    type: "edit_specs",
-    title: "Updated Hyundai Ioniq 6 range",
-    date: "1 day ago",
-    status: "approved",
-    xp: 10,
-    credits: 2,
-  },
-  {
-    id: 3,
-    type: "add_image",
-    title: "Added Rivian R1T photos",
-    date: "2 days ago",
-    status: "approved",
-    xp: 15,
-    credits: 3,
-  },
-  {
-    id: 4,
-    type: "write_review",
-    title: "Tesla Model Y performance review",
-    date: "3 days ago",
-    status: "pending",
-    xp: 0,
-    credits: 0,
-  },
-];
+interface EarnedAchievement extends CatalogAchievement {
+  earnedAt: string;
+}
 
 export default function DashboardPage() {
-  const [activeTab, setActiveTab] = useState<
-    "overview" | "contributions" | "achievements" | "settings"
-  >("overview");
+  const { data: session, status } = useSession();
+  const router = useRouter();
+  const [activeTab, setActiveTab] = useState<"overview" | "achievements" | "settings">("overview");
+  const [stats, setStats] = useState<StatsData | null>(null);
+  const [catalog, setCatalog] = useState<CatalogAchievement[]>([]);
+  const [earned, setEarned] = useState<EarnedAchievement[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.push("/auth/login");
+      return;
+    }
+    if (!session?.user?.id) return;
+
+    const id = session.user.id;
+    Promise.all([
+      fetch(`/api/users/${id}/stats`).then((r) => r.json()),
+      fetch(`/api/users/${id}/achievements`).then((r) => r.json()),
+      fetch(`/api/achievements`).then((r) => r.json()),
+    ])
+      .then(([statsJson, earnedJson, catalogJson]) => {
+        setStats(statsJson.data || null);
+        setEarned(earnedJson.data || []);
+        setCatalog(catalogJson.data || []);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, [session?.user?.id, status, router]);
+
+  if (status === "loading" || loading) {
+    return (
+      <div className="min-h-screen bg-base-200 flex items-center justify-center">
+        <span className="loading loading-spinner loading-lg"></span>
+      </div>
+    );
+  }
+
+  if (!stats) {
+    return (
+      <div className="min-h-screen bg-base-200 flex items-center justify-center">
+        <p className="text-base-content/60">Unable to load dashboard.</p>
+      </div>
+    );
+  }
+
+  const recent = stats.contributions.slice(0, 5);
+  const mergedAchievements = catalog.map((a) => {
+    const e = earned.find((x) => x.id === a.id);
+    return { ...a, earnedAt: e?.earnedAt };
+  });
 
   return (
     <div className="min-h-screen bg-base-200">
-      {/* Hero Section */}
       <div className="hero py-12 bg-base-100">
         <div className="hero-content text-center">
           <div className="max-w-2xl">
@@ -96,7 +120,6 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Main Content */}
       <div className="container mx-auto px-4 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Sidebar Navigation */}
@@ -105,90 +128,56 @@ export default function DashboardPage() {
               <div className="card-body">
                 <nav className="space-y-1">
                   <button
-                    className={`btn btn-block ${
-                      activeTab === "overview" ? "btn-primary" : "btn-ghost"
-                    }`}
+                    className={`btn btn-block justify-start ${activeTab === "overview" ? "btn-primary" : "btn-ghost"}`}
                     onClick={() => setActiveTab("overview")}
                   >
                     <Zap className="h-4 w-4 mr-2" />
                     Overview
                   </button>
-                  <a
-                    href="/contributions/history"
-                    className={`btn btn-block justify-start ${
-                      activeTab === "contributions" ? "btn-primary" : "btn-ghost"
-                    }`}
-                  >
-                    <Car className="h-4 w-4 mr-2" />
-                    Contributions
-                  </a>
-                  <a
-                    href="/rewards"
-                    className={`btn btn-block justify-start ${
-                      activeTab === "achievements" ? "btn-primary" : "btn-ghost"
-                    }`}
+                  <button
+                    className={`btn btn-block justify-start ${activeTab === "achievements" ? "btn-primary" : "btn-ghost"}`}
+                    onClick={() => setActiveTab("achievements")}
                   >
                     <Trophy className="h-4 w-4 mr-2" />
-                    Rewards
-                  </a>
-                  <a
-                    href="/stats"
-                    className="btn btn-block justify-start btn-ghost"
-                  >
+                    Achievements
+                  </button>
+                  <Link href="/contributions/history" className="btn btn-block justify-start btn-ghost">
+                    <History className="h-4 w-4 mr-2" />
+                    Contributions
+                  </Link>
+                  <Link href="/stats" className="btn btn-block justify-start btn-ghost">
                     <BarChart3 className="h-4 w-4 mr-2" />
                     Statistics
-                  </a>
-                  <a
-                    href="/billing"
-                    className="btn btn-block justify-start btn-ghost"
-                  >
+                  </Link>
+                  <Link href="/billing" className="btn btn-block justify-start btn-ghost">
                     <CreditCard className="h-4 w-4 mr-2" />
                     Billing
-                  </a>
-                  <a
-                    href="/api-usage"
-                    className="btn btn-block justify-start btn-ghost"
-                  >
+                  </Link>
+                  <Link href="/api-usage" className="btn btn-block justify-start btn-ghost">
                     <Activity className="h-4 w-4 mr-2" />
                     API Usage
-                  </a>
-                  <a
-                    href="/profile"
-                    className="btn btn-block justify-start btn-ghost"
-                  >
+                  </Link>
+                  <Link href="/profile" className="btn btn-block justify-start btn-ghost">
                     <User className="h-4 w-4 mr-2" />
                     Profile
-                  </a>
-                  <button
-                    className={`btn btn-block ${
-                      activeTab === "settings" ? "btn-primary" : "btn-ghost"
-                    }`}
-                    onClick={() => setActiveTab("settings")}
-                  >
-                    <Settings className="h-4 w-4 mr-2" />
-                    Quick Settings
-                  </button>
+                  </Link>
                 </nav>
               </div>
             </div>
 
-            {/* Quick Actions */}
             <div className="card bg-base-100 shadow-lg mt-6">
               <div className="card-body">
                 <h3 className="font-bold text-lg mb-4">Quick Actions</h3>
                 <div className="space-y-2">
-                  <a href="/contribute" className="btn btn-primary btn-block">
+                  <Link href="/contribute" className="btn btn-primary btn-block">
                     Contribute
-                  </a>
-                  <a href="/stats" className="btn btn-ghost btn-block">
+                  </Link>
+                  <Link href="/stats" className="btn btn-ghost btn-block">
                     View Statistics
-                  </a>
-                  <a href="/billing" className="btn btn-ghost btn-block">
+                  </Link>
+                  <Link href="/credits" className="btn btn-ghost btn-block">
                     Buy Credits
-                  </a>
-                  <a href="/api-usage" className="btn btn-ghost btn-block">
-                    API Usage
-                  </a>
+                  </Link>
                 </div>
               </div>
             </div>
@@ -199,10 +188,10 @@ export default function DashboardPage() {
             {activeTab === "overview" && (
               <>
                 <UserStats
-                  username={USER_STATS.username}
-                  xp={USER_STATS.xp}
-                  credits={USER_STATS.credits}
-                  contributions={USER_STATS.contributions}
+                  username={stats.user.name || "User"}
+                  xp={stats.user.xp}
+                  credits={stats.user.credits}
+                  contributions={stats.user.totalContributions}
                 />
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -212,48 +201,42 @@ export default function DashboardPage() {
                         <History className="h-5 w-5 text-primary inline mr-2" />
                         Recent Contributions
                       </h3>
-                      <div className="space-y-4">
-                        {RECENT_CONTRIBUTIONS.map((contribution) => (
-                          <div key={contribution.id} className="flex items-center gap-3">
-                            <div className="avatar placeholder">
-                              <div className="bg-neutral text-neutral-content rounded-full w-8 h-8">
-                                <span className="text-xs">
-                                  {contribution.title.charAt(0)}
-                                </span>
+                      {recent.length === 0 ? (
+                        <p className="text-base-content/60 text-sm py-4">
+                          No contributions yet. <Link href="/contribute" className="link link-primary">Start contributing!</Link>
+                        </p>
+                      ) : (
+                        <div className="space-y-4">
+                          {recent.map((c) => (
+                            <div key={c.id} className="flex items-center gap-3">
+                              <div className="avatar placeholder">
+                                <div className="bg-neutral text-neutral-content rounded-full w-8 h-8">
+                                  <span className="text-xs">
+                                    {(c.vehicle?.make || c.type).charAt(0)}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium text-sm truncate">
+                                  {c.vehicle ? `${c.vehicle.make} ${c.vehicle.model}` : c.type.replace(/_/g, " ")}
+                                </div>
+                                <div className="flex items-center gap-2 text-xs text-base-content/70">
+                                  <span>{timeAgo(c.createdAt)}</span>
+                                  <span className={`badge badge-xs ${c.status === "APPROVED" ? "badge-success" : "badge-warning"}`}>
+                                    {c.status}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <div className="font-bold text-sm text-primary">+{c.xpReward} XP</div>
                               </div>
                             </div>
-                            <div className="flex-1">
-                              <div className="font-medium text-sm">
-                                {contribution.title}
-                              </div>
-                              <div className="flex items-center gap-2 text-xs text-base-content/70">
-                                <span className="text-xs">{contribution.date}</span>
-                                <span className={`badge badge-xs ${
-                                  contribution.status === "approved"
-                                    ? "badge-success"
-                                    : "badge-warning"
-                                }`}>
-                                  {contribution.status}
-                                </span>
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <div className="font-bold text-sm text-primary">
-                                +{contribution.xp} XP
-                              </div>
-                              <div className="font-bold text-xs text-secondary">
-                                +{contribution.credits}
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                      <a
-                        href="/contributions/history"
-                        className="btn btn-ghost btn-sm btn-block mt-4"
-                      >
+                          ))}
+                        </div>
+                      )}
+                      <Link href="/contributions/history" className="btn btn-ghost btn-sm btn-block mt-4">
                         View All Contributions
-                      </a>
+                      </Link>
                     </div>
                   </div>
 
@@ -265,25 +248,23 @@ export default function DashboardPage() {
                       </h3>
                       <div className="text-center py-4">
                         <div className="text-4xl font-bold text-secondary">
-                          {USER_STATS.credits}
+                          {formatNumber(stats.user.credits)}
                         </div>
-                        <div className="text-sm text-base-content/70 mt-2">
-                          credits available
-                        </div>
+                        <div className="text-sm text-base-content/70 mt-2">credits available</div>
                       </div>
                       <div className="grid grid-cols-2 gap-2">
-                        <button className="btn btn-sm btn-primary">
+                        <Link href="/credits" className="btn btn-sm btn-primary">
                           Buy More Credits
-                        </button>
-                        <button className="btn btn-sm btn-ghost">
-                          View Transaction History
-                        </button>
+                        </Link>
+                        <Link href="/billing" className="btn btn-sm btn-ghost">
+                          Transaction History
+                        </Link>
                       </div>
                       <div className="divider"></div>
                       <div className="text-sm text-base-content/70">
                         <p>
                           <Bell className="h-4 w-4 inline mr-1" />
-                          You earned 5 credits for your recent Tesla Model 3 contribution
+                          You have a {stats.user.streak}-day contribution streak. Keep it up!
                         </p>
                       </div>
                     </div>
@@ -293,63 +274,7 @@ export default function DashboardPage() {
             )}
 
             {activeTab === "achievements" && (
-              <Achievements userAchievements={USER_ACHIEVEMENTS} />
-            )}
-
-            {activeTab === "contributions" && (
-              <div className="card bg-base-100 shadow-lg">
-                <div className="card-body">
-                  <h3 className="font-bold text-lg mb-4">
-                    <History className="h-5 w-5 text-primary inline mr-2" />
-                    All Contributions
-                  </h3>
-                  <div className="overflow-x-auto">
-                    <table className="table table-zebra">
-                      <thead>
-                        <tr>
-                          <th>Date</th>
-                          <th>Type</th>
-                          <th>Details</th>
-                          <th>Status</th>
-                          <th>Rewards</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {RECENT_CONTRIBUTIONS.map((contribution) => (
-                          <tr key={contribution.id}>
-                            <td className="text-sm text-base-content/70">
-                              {contribution.date}
-                            </td>
-                            <td className="text-sm">
-                              <span className="badge badge-primary badge-sm">
-                                {contribution.type.replace("_", " ")}
-                              </span>
-                            </td>
-                            <td className="text-sm">{contribution.title}</td>
-                            <td>
-                              <span className={`badge ${
-                                contribution.status === "approved"
-                                  ? "badge-success"
-                                  : "badge-warning"
-                              } badge-sm`}>
-                                {contribution.status}
-                              </span>
-                            </td>
-                            <td className="text-sm">
-                              <span className="text-primary font-bold">
-                                +{contribution.xp} XP
-                              </span>{" "}
-                              <span className="text-secondary font-bold">
-                                +{contribution.credits}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
+              <Achievements achievements={mergedAchievements} />
             )}
 
             {activeTab === "settings" && (
@@ -359,94 +284,10 @@ export default function DashboardPage() {
                     <Settings className="h-5 w-5 text-primary inline mr-2" />
                     Account Settings
                   </h3>
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="form-control">
-                        <label className="label">
-                          <span className="label-text">Username</span>
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="Username"
-                          className="input input-bordered"
-                          defaultValue="EVEnthusiast"
-                        />
-                      </div>
-                      <div className="form-control">
-                        <label className="label">
-                          <span className="label-text">Email</span>
-                        </label>
-                        <input
-                          type="email"
-                          placeholder="Email"
-                          className="input input-bordered"
-                          defaultValue="ev.enthusiast@example.com"
-                        />
-                      </div>
-                      <div className="form-control">
-                        <label className="label">
-                          <span className="label-text">Password</span>
-                        </label>
-                        <input
-                          type="password"
-                          placeholder="Password"
-                          className="input input-bordered"
-                          defaultValue="••••••••"
-                        />
-                      </div>
-                      <div className="form-control">
-                        <label className="label">
-                          <span className="label-text">API Key</span>
-                        </label>
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            className="input input-bordered flex-1"
-                            defaultValue="pk_ev_hub_1234567890abcdef"
-                            readOnly
-                          />
-                          <button className="btn btn-ghost">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                              <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-                              <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
-                            </svg>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="form-control">
-                      <label className="label cursor-pointer">
-                        <span className="label-text">Email Notifications</span>
-                        <input
-                          type="checkbox"
-                          defaultChecked
-                          className="toggle toggle-primary"
-                        />
-                      </label>
-                    </div>
-                    <div className="form-control">
-                      <label className="label cursor-pointer">
-                        <span className="label-text">Push Notifications</span>
-                        <input
-                          type="checkbox"
-                          className="toggle toggle-primary"
-                        />
-                      </label>
-                    </div>
-                    <div className="form-control">
-                      <label className="label cursor-pointer">
-                        <span className="label-text">Newsletter</span>
-                        <input
-                          type="checkbox"
-                          defaultChecked
-                          className="toggle toggle-primary"
-                        />
-                      </label>
-                    </div>
-                    <div className="card-actions justify-end">
-                      <button className="btn btn-primary">Save Changes</button>
-                    </div>
-                  </div>
+                  <p className="text-base-content/60">
+                    Manage your full account settings from the{" "}
+                    <Link href="/profile" className="link link-primary">Profile page</Link>.
+                  </p>
                 </div>
               </div>
             )}

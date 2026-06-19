@@ -7,6 +7,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const timeframe = searchParams.get("timeframe") || "monthly"; // weekly, monthly, allTime
     const limit = searchParams.get("limit") || "20";
+    const userId = searchParams.get("userId");
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let dateFilter: any = {};
@@ -88,6 +89,14 @@ export async function GET(request: NextRequest) {
       success: true,
       data: leaderboard,
       timeframe,
+      meta: {
+        totalContributors: await prisma.user.count({
+          where: { NOT: { role: "ADMIN" } },
+        }),
+        yourRank: userId
+          ? (await computeUserRank(userId))
+          : null,
+      },
     });
   } catch (error) {
     console.error("Error fetching leaderboard:", error);
@@ -96,4 +105,26 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+async function computeUserRank(targetUserId: string): Promise<{
+  rank: number;
+  xp: number;
+  contributions: number;
+} | null> {
+  const target = await prisma.user.findUnique({
+    where: { id: targetUserId },
+    select: { xp: true },
+  });
+  if (!target) return null;
+
+  const higher = await prisma.user.count({
+    where: { xp: { gt: target.xp }, NOT: { role: "ADMIN" } },
+  });
+
+  const approvedCount = await prisma.contribution.count({
+    where: { userId: targetUserId, status: "APPROVED" },
+  });
+
+  return { rank: higher + 1, xp: target.xp, contributions: approvedCount };
 }

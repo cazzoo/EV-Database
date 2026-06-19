@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { signOut } from "next-auth/react";
 import {
   User,
   Mail,
@@ -12,68 +13,214 @@ import {
   Key,
   Eye,
   EyeOff,
-  Camera,
   MapPin,
-  Calendar,
+  Plus,
+  Trash2,
+  Check,
 } from "lucide-react";
+import { formatMonthYear, formatDate, timeAgo } from "@/lib/format";
+
+interface Profile {
+  id: string;
+  name: string;
+  email: string;
+  image: string | null;
+  bio: string | null;
+  location: string | null;
+  website: string | null;
+  role: string;
+  createdAt: string;
+}
+
+interface ApiKey {
+  id: string;
+  key: string;
+  name: string;
+  tier: string;
+  rateLimit: number;
+  lastUsedAt: string | null;
+  createdAt: string;
+  expiresAt: string | null;
+}
+
+const DEFAULT_NOTIFICATIONS = {
+  emailNotifications: true,
+  pushNotifications: false,
+  newsletter: true,
+  contributionUpdates: true,
+  achievementAlerts: true,
+  creditLowAlert: true,
+};
 
 export default function ProfilePage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [activeTab, setActiveTab] = useState<"profile" | "security" | "notifications" | "api">("profile");
 
-  const [profileData, setProfileData] = useState({
-    name: session?.user?.name || "",
-    email: session?.user?.email || "",
-    bio: "",
-    location: "",
-    website: "",
-    avatar: "",
-  });
+  const [profileData, setProfileData] = useState<Profile | null>(null);
+  const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
+  const [revealedKeys, setRevealedKeys] = useState<Record<string, string>>({});
+  const [newKeyName, setNewKeyName] = useState("");
+  const [newKeyTier, setNewKeyTier] = useState("FREE");
+  const [newKeyExpiry, setNewKeyExpiry] = useState("");
+  const [generatedKey, setGeneratedKey] = useState<string | null>(null);
 
-  const [passwordData, setPasswordData] = useState({
-    currentPassword: "",
-    newPassword: "",
-    confirmPassword: "",
-  });
+  const [passwordData, setPasswordData] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
 
-  const [notificationSettings, setNotificationSettings] = useState({
-    emailNotifications: true,
-    pushNotifications: false,
-    newsletter: true,
-    contributionUpdates: true,
-    achievementAlerts: true,
-    creditLowAlert: true,
-  });
+  const [notificationSettings, setNotificationSettings] = useState(DEFAULT_NOTIFICATIONS);
+
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.push("/auth/login");
+      return;
+    }
+    if (!session?.user?.id) return;
+    const id = session.user.id;
+    fetch(`/api/users/${id}`)
+      .then((r) => r.json())
+      .then((json) => {
+        if (json.data) setProfileData(json.data);
+      });
+    fetch(`/api/users/${id}/notifications`)
+      .then((r) => r.json())
+      .then((json) => json.data && setNotificationSettings(json.data));
+    loadApiKeys(id);
+  }, [session?.user?.id, status, router]);
+
+  const loadApiKeys = (id: string) => {
+    fetch(`/api/users/${id}/api-keys`)
+      .then((r) => r.json())
+      .then((json) => setApiKeys(json.data || []));
+  };
+
+  const flash = (type: "success" | "error", text: string) => {
+    setMessage({ type, text });
+    setTimeout(() => setMessage(null), 4000);
+  };
 
   const handleProfileUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!session?.user?.id || !profileData) return;
     setLoading(true);
-    // TODO: Implement profile update API call
-    setTimeout(() => {
-      setLoading(false);
-      alert("Profile updated successfully!");
-    }, 1000);
+    const res = await fetch(`/api/users/${session.user.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: profileData.name,
+        email: profileData.email,
+        bio: profileData.bio,
+        location: profileData.location,
+        website: profileData.website,
+      }),
+    });
+    setLoading(false);
+    if (res.ok) {
+      flash("success", "Profile updated successfully!");
+    } else {
+      const json = await res.json().catch(() => ({}));
+      flash("error", json.error || "Failed to update profile");
+    }
   };
 
   const handlePasswordUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!session?.user?.id) return;
     if (passwordData.newPassword !== passwordData.confirmPassword) {
-      alert("Passwords do not match!");
+      flash("error", "Passwords do not match!");
       return;
     }
     setLoading(true);
-    // TODO: Implement password update API call
-    setTimeout(() => {
-      setLoading(false);
-      alert("Password updated successfully!");
+    const res = await fetch(`/api/users/${session.user.id}/password`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        currentPassword: passwordData.currentPassword,
+        newPassword: passwordData.newPassword,
+      }),
+    });
+    setLoading(false);
+    if (res.ok) {
+      flash("success", "Password updated successfully!");
       setPasswordData({ currentPassword: "", newPassword: "", confirmPassword: "" });
-    }, 1000);
+    } else {
+      const json = await res.json().catch(() => ({}));
+      flash("error", json.error || "Failed to update password");
+    }
   };
 
-  if (status === "loading") {
+  const handleNotificationSave = async () => {
+    if (!session?.user?.id) return;
+    setLoading(true);
+    const res = await fetch(`/api/users/${session.user.id}/notifications`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(notificationSettings),
+    });
+    setLoading(false);
+    flash(res.ok ? "success" : "error", res.ok ? "Preferences saved!" : "Failed to save preferences");
+  };
+
+  const handleCreateKey = async () => {
+    if (!session?.user?.id || !newKeyName) return;
+    setLoading(true);
+    const res = await fetch(`/api/users/${session.user.id}/api-keys`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: newKeyName,
+        tier: newKeyTier,
+        expiresInDays: newKeyExpiry ? Number(newKeyExpiry) : null,
+      }),
+    });
+    setLoading(false);
+    if (res.ok) {
+      const json = await res.json();
+      setGeneratedKey(json.data.key);
+      setNewKeyName("");
+      loadApiKeys(session.user.id);
+      flash("success", "API key created. Copy it now — it won't be shown again.");
+    } else {
+      flash("error", "Failed to create API key");
+    }
+  };
+
+  const handleRevokeKey = async (keyId: string) => {
+    if (!session?.user?.id) return;
+    if (!confirm("Revoke this API key? This cannot be undone.")) return;
+    const res = await fetch(`/api/users/${session.user.id}/api-keys/${keyId}`, { method: "DELETE" });
+    if (res.ok) {
+      loadApiKeys(session.user.id);
+      flash("success", "API key revoked.");
+    }
+  };
+
+  const handleRevealKey = async (keyId: string) => {
+    const value = prompt("Enter the full API key to reveal:");
+    if (value) setRevealedKeys({ ...revealedKeys, [keyId]: value });
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!session?.user?.id) return;
+    const password = prompt("Enter your password to confirm account deletion:");
+    if (!password) return;
+    const res = await fetch(`/api/users/${session.user.id}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ confirm: true, password }),
+    });
+    if (res.ok) {
+      await signOut({ redirect: false });
+      router.push("/");
+    } else {
+      const json = await res.json().catch(() => ({}));
+      flash("error", json.error || "Failed to delete account");
+    }
+  };
+
+  if (status === "loading" || !profileData) {
     return (
       <div className="min-h-screen bg-base-200 flex items-center justify-center">
         <span className="loading loading-spinner loading-lg"></span>
@@ -81,14 +228,15 @@ export default function ProfilePage() {
     );
   }
 
-  if (status === "unauthenticated") {
-    router.push("/auth/login");
-    return null;
-  }
+  const tabs: { id: typeof activeTab; label: string; icon: typeof User }[] = [
+    { id: "profile", label: "Profile", icon: User },
+    { id: "security", label: "Security", icon: Lock },
+    { id: "notifications", label: "Notifications", icon: Bell },
+    { id: "api", label: "API Keys", icon: Key },
+  ];
 
   return (
     <div className="min-h-screen bg-base-200">
-      {/* Hero Section */}
       <div className="hero py-12 bg-base-100">
         <div className="hero-content text-center">
           <div className="max-w-2xl">
@@ -103,67 +251,42 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      {/* Main Content */}
       <div className="container mx-auto px-4 py-8">
+        {message && (
+          <div className={`alert ${message.type === "success" ? "alert-success" : "alert-error"} mb-6`}>
+            <span>{message.text}</span>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          {/* Sidebar Navigation */}
+          {/* Sidebar */}
           <div className="lg:col-span-1">
             <div className="card bg-base-100 shadow-lg">
               <div className="card-body">
-                {/* User Avatar */}
                 <div className="text-center mb-6">
                   <div className="avatar placeholder">
                     <div className="bg-primary text-primary-content rounded-full w-24 h-24">
                       <span className="text-3xl">
-                        {profileData.name.charAt(0).toUpperCase()}
+                        {(profileData.name || "?").charAt(0).toUpperCase()}
                       </span>
                     </div>
                   </div>
                   <h3 className="font-bold text-lg mt-3">{profileData.name}</h3>
                   <p className="text-sm text-base-content/70">{profileData.email}</p>
-                  <div className="badge badge-primary badge-sm mt-2">
-                    {session?.user?.role || "MEMBER"}
-                  </div>
+                  <div className="badge badge-primary badge-sm mt-2">{profileData.role}</div>
                 </div>
 
-                {/* Navigation Tabs */}
                 <nav className="space-y-1">
-                  <button
-                    className={`btn btn-block justify-start ${
-                      activeTab === "profile" ? "btn-primary" : "btn-ghost"
-                    }`}
-                    onClick={() => setActiveTab("profile")}
-                  >
-                    <User className="h-4 w-4 mr-2" />
-                    Profile
-                  </button>
-                  <button
-                    className={`btn btn-block justify-start ${
-                      activeTab === "security" ? "btn-primary" : "btn-ghost"
-                    }`}
-                    onClick={() => setActiveTab("security")}
-                  >
-                    <Lock className="h-4 w-4 mr-2" />
-                    Security
-                  </button>
-                  <button
-                    className={`btn btn-block justify-start ${
-                      activeTab === "notifications" ? "btn-primary" : "btn-ghost"
-                    }`}
-                    onClick={() => setActiveTab("notifications")}
-                  >
-                    <Bell className="h-4 w-4 mr-2" />
-                    Notifications
-                  </button>
-                  <button
-                    className={`btn btn-block justify-start ${
-                      activeTab === "api" ? "btn-primary" : "btn-ghost"
-                    }`}
-                    onClick={() => setActiveTab("api")}
-                  >
-                    <Key className="h-4 w-4 mr-2" />
-                    API Keys
-                  </button>
+                  {tabs.map((tab) => (
+                    <button
+                      key={tab.id}
+                      className={`btn btn-block justify-start ${activeTab === tab.id ? "btn-primary" : "btn-ghost"}`}
+                      onClick={() => setActiveTab(tab.id)}
+                    >
+                      <tab.icon className="h-4 w-4 mr-2" />
+                      {tab.label}
+                    </button>
+                  ))}
                 </nav>
               </div>
             </div>
@@ -180,26 +303,6 @@ export default function ProfilePage() {
                     Profile Information
                   </h2>
                   <form onSubmit={handleProfileUpdate} className="space-y-6">
-                    {/* Avatar Upload */}
-                    <div className="form-control">
-                      <label className="label">
-                        <span className="label-text">Profile Picture</span>
-                      </label>
-                      <div className="flex items-center gap-4">
-                        <div className="avatar placeholder">
-                          <div className="bg-neutral text-neutral-content rounded-full w-20 h-20">
-                            <span className="text-2xl">
-                              {profileData.name.charAt(0).toUpperCase()}
-                            </span>
-                          </div>
-                        </div>
-                        <button className="btn btn-ghost">
-                          <Camera className="h-4 w-4 mr-2" />
-                          Change Avatar
-                        </button>
-                      </div>
-                    </div>
-
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="form-control">
                         <label className="label">
@@ -240,7 +343,7 @@ export default function ProfilePage() {
                             type="text"
                             className="input input-bordered pl-10"
                             placeholder="City, Country"
-                            value={profileData.location}
+                            value={profileData.location || ""}
                             onChange={(e) => setProfileData({ ...profileData, location: e.target.value })}
                           />
                         </div>
@@ -254,7 +357,7 @@ export default function ProfilePage() {
                           type="url"
                           className="input input-bordered"
                           placeholder="https://yourwebsite.com"
-                          value={profileData.website}
+                          value={profileData.website || ""}
                           onChange={(e) => setProfileData({ ...profileData, website: e.target.value })}
                         />
                       </div>
@@ -267,18 +370,20 @@ export default function ProfilePage() {
                       <textarea
                         className="textarea textarea-bordered"
                         rows={4}
+                        maxLength={500}
                         placeholder="Tell us about yourself..."
-                        value={profileData.bio}
+                        value={profileData.bio || ""}
                         onChange={(e) => setProfileData({ ...profileData, bio: e.target.value })}
                       ></textarea>
                       <label className="label">
-                        <span className="label-text-alt">Max 500 characters</span>
+                        <span className="label-text-alt">{(profileData.bio || "").length}/500 characters</span>
                       </label>
                     </div>
 
                     <div className="card-actions justify-end">
                       <button type="submit" className="btn btn-primary" disabled={loading}>
-                        {loading ? <span className="loading loading-spinner"></span> : "Save Changes"}
+                        {loading ? <span className="loading loading-spinner"></span> : <Check className="h-4 w-4" />}
+                        Save Changes
                       </button>
                     </div>
                   </form>
@@ -295,7 +400,6 @@ export default function ProfilePage() {
                     Security Settings
                   </h2>
 
-                  {/* Change Password */}
                   <div className="mb-8">
                     <h3 className="font-bold text-lg mb-4">Change Password</h3>
                     <form onSubmit={handlePasswordUpdate} className="space-y-4">
@@ -303,67 +407,48 @@ export default function ProfilePage() {
                         <label className="label">
                           <span className="label-text">Current Password</span>
                         </label>
-                        <div className="relative">
-                          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-base-content/50" />
-                          <input
-                            type="password"
-                            className="input input-bordered pl-10"
-                            value={passwordData.currentPassword}
-                            onChange={(e) =>
-                              setPasswordData({ ...passwordData, currentPassword: e.target.value })
-                            }
-                            required
-                          />
-                        </div>
+                        <input
+                          type="password"
+                          className="input input-bordered"
+                          value={passwordData.currentPassword}
+                          onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
+                          required
+                        />
                       </div>
-
                       <div className="form-control">
                         <label className="label">
                           <span className="label-text">New Password</span>
                         </label>
                         <div className="relative">
-                          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-base-content/50" />
                           <input
                             type={showPassword ? "text" : "password"}
-                            className="input input-bordered pl-10 pr-10"
+                            className="input input-bordered pr-10"
                             value={passwordData.newPassword}
-                            onChange={(e) =>
-                              setPasswordData({ ...passwordData, newPassword: e.target.value })
-                            }
+                            onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
                             required
+                            minLength={8}
                           />
                           <button
                             type="button"
                             className="absolute right-3 top-1/2 -translate-y-1/2"
                             onClick={() => setShowPassword(!showPassword)}
                           >
-                            {showPassword ? (
-                              <EyeOff className="h-5 w-5 text-base-content/50" />
-                            ) : (
-                              <Eye className="h-5 w-5 text-base-content/50" />
-                            )}
+                            {showPassword ? <EyeOff className="h-5 w-5 text-base-content/50" /> : <Eye className="h-5 w-5 text-base-content/50" />}
                           </button>
                         </div>
                       </div>
-
                       <div className="form-control">
                         <label className="label">
                           <span className="label-text">Confirm New Password</span>
                         </label>
-                        <div className="relative">
-                          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-base-content/50" />
-                          <input
-                            type="password"
-                            className="input input-bordered pl-10"
-                            value={passwordData.confirmPassword}
-                            onChange={(e) =>
-                              setPasswordData({ ...passwordData, confirmPassword: e.target.value })
-                            }
-                            required
-                          />
-                        </div>
+                        <input
+                          type="password"
+                          className="input input-bordered"
+                          value={passwordData.confirmPassword}
+                          onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                          required
+                        />
                       </div>
-
                       <div className="card-actions justify-end">
                         <button type="submit" className="btn btn-primary" disabled={loading}>
                           {loading ? <span className="loading loading-spinner"></span> : "Update Password"}
@@ -372,19 +457,16 @@ export default function ProfilePage() {
                     </form>
                   </div>
 
-                  {/* Account Information */}
                   <div className="border-t border-base-300 pt-6">
                     <h3 className="font-bold text-lg mb-4">Account Information</h3>
                     <div className="space-y-3">
                       <div className="flex justify-between items-center">
                         <span className="text-base-content/70">Member Since</span>
-                        <span className="font-semibold">
-                          {session?.user ? "Feb 2024" : "Unknown"}
-                        </span>
+                        <span className="font-semibold">{formatMonthYear(profileData.createdAt)}</span>
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-base-content/70">Account Type</span>
-                        <span className="badge badge-primary">{session?.user?.role || "MEMBER"}</span>
+                        <span className="badge badge-primary">{profileData.role}</span>
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-base-content/70">Account Status</span>
@@ -393,23 +475,9 @@ export default function ProfilePage() {
                     </div>
                   </div>
 
-                  {/* Danger Zone */}
                   <div className="border-t border-base-300 pt-6 mt-6">
                     <h3 className="font-bold text-lg mb-4 text-error">Danger Zone</h3>
                     <div className="alert alert-error">
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="stroke-current shrink-0 h-6 w-6"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth="2"
-                          d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                        />
-                      </svg>
                       <div>
                         <h4 className="font-bold">Delete Account</h4>
                         <p className="text-xs">
@@ -417,7 +485,9 @@ export default function ProfilePage() {
                         </p>
                       </div>
                     </div>
-                    <button className="btn btn-error mt-4">Delete Account</button>
+                    <button className="btn btn-error mt-4" onClick={handleDeleteAccount}>
+                      Delete Account
+                    </button>
                   </div>
                 </div>
               </div>
@@ -432,140 +502,34 @@ export default function ProfilePage() {
                     Notification Preferences
                   </h2>
                   <div className="space-y-4">
-                    <div className="form-control">
-                      <label className="label cursor-pointer">
-                        <span className="label-text font-semibold">Email Notifications</span>
-                        <input
-                          type="checkbox"
-                          className="toggle toggle-primary"
-                          checked={notificationSettings.emailNotifications}
-                          onChange={(e) =>
-                            setNotificationSettings({
-                              ...notificationSettings,
-                              emailNotifications: e.target.checked,
-                            })
-                          }
-                        />
-                      </label>
-                      <label className="label">
-                        <span className="label-text-alt">
-                          Receive email notifications about your account activity
-                        </span>
-                      </label>
-                    </div>
-
-                    <div className="form-control">
-                      <label className="label cursor-pointer">
-                        <span className="label-text font-semibold">Push Notifications</span>
-                        <input
-                          type="checkbox"
-                          className="toggle toggle-primary"
-                          checked={notificationSettings.pushNotifications}
-                          onChange={(e) =>
-                            setNotificationSettings({
-                              ...notificationSettings,
-                              pushNotifications: e.target.checked,
-                            })
-                          }
-                        />
-                      </label>
-                      <label className="label">
-                        <span className="label-text-alt">
-                          Receive push notifications in your browser
-                        </span>
-                      </label>
-                    </div>
-
-                    <div className="form-control">
-                      <label className="label cursor-pointer">
-                        <span className="label-text font-semibold">Newsletter</span>
-                        <input
-                          type="checkbox"
-                          className="toggle toggle-primary"
-                          checked={notificationSettings.newsletter}
-                          onChange={(e) =>
-                            setNotificationSettings({
-                              ...notificationSettings,
-                              newsletter: e.target.checked,
-                            })
-                          }
-                        />
-                      </label>
-                      <label className="label">
-                        <span className="label-text-alt">
-                          Receive weekly newsletter with updates and tips
-                        </span>
-                      </label>
-                    </div>
-
-                    <div className="form-control">
-                      <label className="label cursor-pointer">
-                        <span className="label-text font-semibold">Contribution Updates</span>
-                        <input
-                          type="checkbox"
-                          className="toggle toggle-primary"
-                          checked={notificationSettings.contributionUpdates}
-                          onChange={(e) =>
-                            setNotificationSettings({
-                              ...notificationSettings,
-                              contributionUpdates: e.target.checked,
-                            })
-                          }
-                        />
-                      </label>
-                      <label className="label">
-                        <span className="label-text-alt">
-                          Get notified when your contributions are reviewed
-                        </span>
-                      </label>
-                    </div>
-
-                    <div className="form-control">
-                      <label className="label cursor-pointer">
-                        <span className="label-text font-semibold">Achievement Alerts</span>
-                        <input
-                          type="checkbox"
-                          className="toggle toggle-primary"
-                          checked={notificationSettings.achievementAlerts}
-                          onChange={(e) =>
-                            setNotificationSettings({
-                              ...notificationSettings,
-                              achievementAlerts: e.target.checked,
-                            })
-                          }
-                        />
-                      </label>
-                      <label className="label">
-                        <span className="label-text-alt">
-                          Celebrate when you unlock new achievements
-                        </span>
-                      </label>
-                    </div>
-
-                    <div className="form-control">
-                      <label className="label cursor-pointer">
-                        <span className="label-text font-semibold">Low Credit Alert</span>
-                        <input
-                          type="checkbox"
-                          className="toggle toggle-primary"
-                          checked={notificationSettings.creditLowAlert}
-                          onChange={(e) =>
-                            setNotificationSettings({
-                              ...notificationSettings,
-                              creditLowAlert: e.target.checked,
-                            })
-                          }
-                        />
-                      </label>
-                      <label className="label">
-                        <span className="label-text-alt">
-                          Get alerted when your credits are running low
-                        </span>
-                      </label>
-                    </div>
+                    {([
+                      ["emailNotifications", "Email Notifications", "Receive email notifications about your account activity"],
+                      ["pushNotifications", "Push Notifications", "Receive push notifications in your browser"],
+                      ["newsletter", "Newsletter", "Receive weekly newsletter with updates and tips"],
+                      ["contributionUpdates", "Contribution Updates", "Get notified when your contributions are reviewed"],
+                      ["achievementAlerts", "Achievement Alerts", "Celebrate when you unlock new achievements"],
+                      ["creditLowAlert", "Low Credit Alert", "Get alerted when your credits are running low"],
+                    ] as const).map(([key, title, desc]) => (
+                      <div className="form-control" key={key}>
+                        <label className="label cursor-pointer">
+                          <span className="label-text font-semibold">{title}</span>
+                          <input
+                            type="checkbox"
+                            className="toggle toggle-primary"
+                            checked={notificationSettings[key]}
+                            onChange={(e) =>
+                              setNotificationSettings({ ...notificationSettings, [key]: e.target.checked })
+                            }
+                          />
+                        </label>
+                        <label className="label">
+                          <span className="label-text-alt">{desc}</span>
+                        </label>
+                      </div>
+                    ))}
 
                     <div className="card-actions justify-end pt-4 border-t border-base-300">
-                      <button className="btn btn-primary" disabled={loading}>
+                      <button className="btn btn-primary" disabled={loading} onClick={handleNotificationSave}>
                         {loading ? <span className="loading loading-spinner"></span> : "Save Preferences"}
                       </button>
                     </div>
@@ -583,75 +547,53 @@ export default function ProfilePage() {
                     API Keys
                   </h2>
 
-                  <div className="alert alert-info mb-6">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      className="stroke-current shrink-0 h-6 w-6"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                      />
-                    </svg>
-                    <div>
-                      <h4 className="font-bold">API Access</h4>
-                      <p className="text-sm">
-                        Use your API key to access the EV Hub API. Keep it secret and never share it publicly.
-                      </p>
+                  {generatedKey && (
+                    <div className="alert alert-warning mb-6">
+                      <div className="flex-1">
+                        <h4 className="font-bold">Copy your new API key</h4>
+                        <code className="text-sm break-all">{generatedKey}</code>
+                      </div>
+                      <button className="btn btn-sm" onClick={() => setGeneratedKey(null)}>Dismiss</button>
                     </div>
-                  </div>
+                  )}
 
-                  {/* Existing API Keys */}
                   <div className="mb-6">
                     <h3 className="font-bold text-lg mb-4">Your API Keys</h3>
-                    <div className="space-y-3">
-                      <div className="card bg-base-200">
-                        <div className="card-body p-4">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <h4 className="font-semibold">Production Key</h4>
-                              <code className="text-sm bg-base-300 px-2 py-1 rounded">
-                                pk_ev_hub_********************
-                              </code>
-                              <div className="text-xs text-base-content/70 mt-1">
-                                Created: Feb 1, 2024 • Last used: 2 hours ago
+                    {apiKeys.length === 0 ? (
+                      <p className="text-base-content/60 text-sm">You have no API keys yet.</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {apiKeys.map((k) => (
+                          <div className="card bg-base-200" key={k.id}>
+                            <div className="card-body p-4">
+                              <div className="flex items-center justify-between gap-4 flex-wrap">
+                                <div className="min-w-0">
+                                  <h4 className="font-semibold">{k.name}</h4>
+                                  <code className="text-sm bg-base-300 px-2 py-1 rounded break-all">
+                                    {revealedKeys[k.id] || k.key}
+                                  </code>
+                                  <div className="text-xs text-base-content/70 mt-1">
+                                    {k.tier} tier • Created {formatDate(k.createdAt)}
+                                    {k.lastUsedAt ? ` • Last used ${timeAgo(k.lastUsedAt)}` : " • Never used"}
+                                  </div>
+                                </div>
+                                <div className="flex gap-2">
+                                  <button className="btn btn-ghost btn-sm" onClick={() => handleRevealKey(k.id)}>
+                                    Reveal
+                                  </button>
+                                  <button className="btn btn-error btn-sm" onClick={() => handleRevokeKey(k.id)}>
+                                    <Trash2 className="h-4 w-4" />
+                                    Revoke
+                                  </button>
+                                </div>
                               </div>
                             </div>
-                            <div className="flex gap-2">
-                              <button className="btn btn-ghost btn-sm">Reveal</button>
-                              <button className="btn btn-error btn-sm">Revoke</button>
-                            </div>
                           </div>
-                        </div>
+                        ))}
                       </div>
-
-                      <div className="card bg-base-200">
-                        <div className="card-body p-4">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <h4 className="font-semibold">Test Key</h4>
-                              <code className="text-sm bg-base-300 px-2 py-1 rounded">
-                                pk_test_ev_hub_********************
-                              </code>
-                              <div className="text-xs text-base-content/70 mt-1">
-                                Created: Jan 15, 2024 • Last used: 1 day ago
-                              </div>
-                            </div>
-                            <div className="flex gap-2">
-                              <button className="btn btn-ghost btn-sm">Reveal</button>
-                              <button className="btn btn-error btn-sm">Revoke</button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                    )}
                   </div>
 
-                  {/* Create New API Key */}
                   <div className="border-t border-base-300 pt-6">
                     <h3 className="font-bold text-lg mb-4">Create New API Key</h3>
                     <div className="space-y-4">
@@ -663,59 +605,42 @@ export default function ProfilePage() {
                           type="text"
                           className="input input-bordered"
                           placeholder="e.g., Development Key"
+                          value={newKeyName}
+                          onChange={(e) => setNewKeyName(e.target.value)}
                         />
                       </div>
-                      <div className="form-control">
-                        <label className="label">
-                          <span className="label-text">Tier</span>
-                        </label>
-                        <select className="select select-bordered">
-                          <option value="free">Free (100 calls/day)</option>
-                          <option value="basic">Basic (5,000 calls/day)</option>
-                          <option value="pro">Pro (100,000 calls/day)</option>
-                        </select>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="form-control">
+                          <label className="label">
+                            <span className="label-text">Tier</span>
+                          </label>
+                          <select className="select select-bordered" value={newKeyTier} onChange={(e) => setNewKeyTier(e.target.value)}>
+                            <option value="FREE">Free (100 calls/day)</option>
+                            <option value="BASIC">Basic (5,000 calls/day)</option>
+                            <option value="PRO">Pro (100,000 calls/day)</option>
+                            <option value="ENTERPRISE">Enterprise (Unlimited)</option>
+                          </select>
+                        </div>
+                        <div className="form-control">
+                          <label className="label">
+                            <span className="label-text">Expiration</span>
+                          </label>
+                          <select className="select select-bordered" value={newKeyExpiry} onChange={(e) => setNewKeyExpiry(e.target.value)}>
+                            <option value="">Never</option>
+                            <option value="30">30 days</option>
+                            <option value="90">90 days</option>
+                            <option value="365">1 year</option>
+                          </select>
+                        </div>
                       </div>
-                      <div className="form-control">
-                        <label className="label">
-                          <span className="label-text">Expiration</span>
-                        </label>
-                        <select className="select select-bordered">
-                          <option value="never">Never</option>
-                          <option value="30">30 days</option>
-                          <option value="90">90 days</option>
-                          <option value="365">1 year</option>
-                        </select>
-                      </div>
-                      <button className="btn btn-primary">Generate API Key</button>
-                    </div>
-                  </div>
-
-                  {/* API Documentation Link */}
-                  <div className="border-t border-base-300 pt-6 mt-6">
-                    <div className="alert alert-success">
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="stroke-current shrink-0 h-6 w-6"
-                        fill="none"
-                        viewBox="0 0 24 24"
+                      <button
+                        className="btn btn-primary"
+                        disabled={loading || !newKeyName}
+                        onClick={handleCreateKey}
                       >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth="2"
-                          d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                        />
-                      </svg>
-                      <div>
-                        <h4 className="font-bold">Need Help?</h4>
-                        <p className="text-sm">
-                          Check out our{" "}
-                          <a href="/docs/api" className="link link-primary">
-                            API Documentation
-                          </a>{" "}
-                          for integration guides and examples.
-                        </p>
-                      </div>
+                        <Plus className="h-4 w-4" />
+                        Generate API Key
+                      </button>
                     </div>
                   </div>
                 </div>
