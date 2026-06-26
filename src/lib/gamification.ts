@@ -9,6 +9,8 @@ export const ROLES = [
   { name: "Legend", minXP: 15000, color: "badge-success" },
 ] as const;
 
+type Role = (typeof ROLES)[number];
+
 export const ACHIEVEMENTS = [
   {
     id: "first_edit",
@@ -78,10 +80,8 @@ export const CONTRIBUTION_TYPES: Record<string, { xp: number; credits: number }>
 };
 
 export function getLevel(xp: number) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let currentRole: any = ROLES[0];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let nextRole: any = ROLES[1];
+  let currentRole: Role = ROLES[0];
+  let nextRole: Role = ROLES[1];
   
   for (let i = 0; i < ROLES.length; i++) {
     if (xp >= ROLES[i].minXP) {

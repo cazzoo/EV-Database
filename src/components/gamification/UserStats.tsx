@@ -1,6 +1,6 @@
 "use client";
 
-import { getLevel, ROLES } from "@/lib/gamification";
+import { getLevel } from "@/lib/gamification";
 
 interface UserStatsProps {
   username: string;
