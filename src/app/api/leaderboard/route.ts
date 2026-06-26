@@ -9,7 +9,6 @@ export async function GET(request: NextRequest) {
     const limit = searchParams.get("limit") || "20";
     const userId = searchParams.get("userId");
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let dateFilter: any = {};
     
     if (timeframe === "weekly") {

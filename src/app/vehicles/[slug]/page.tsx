@@ -22,12 +22,7 @@ interface VehiclePageProps {
   params: Promise<{ slug: string }>;
 }
 
-export async function generateStaticParams() {
-  const vehicles = await prisma.electricVehicle.findMany({
-    select: { make: true, model: true },
-  });
-  return vehicles.map((v) => ({ slug: vehicleSlug(v) }));
-}
+export const dynamic = "force-dynamic";
 
 async function getVehicleBySlug(slug: string) {
   const candidates = await prisma.electricVehicle.findMany({

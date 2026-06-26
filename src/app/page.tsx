@@ -12,6 +12,8 @@ import { vehicleSlug, voteScore } from "@/lib/vehicles";
 import { formatNumber, formatCurrency } from "@/lib/format";
 import { getLevel } from "@/lib/gamification";
 
+export const dynamic = "force-dynamic";
+
 export default async function Home() {
   const [vehicles, contributors, totalVehicles, totalUsers] = await Promise.all([
     prisma.electricVehicle.findMany({

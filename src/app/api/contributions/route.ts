@@ -14,7 +14,6 @@ export async function GET(request: NextRequest) {
     const page = searchParams.get("page") || "1";
     const limit = searchParams.get("limit") || "20";
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const where: any = {};
     if (userId) {
       where.userId = userId;
