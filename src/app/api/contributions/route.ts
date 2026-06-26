@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import {
   calculateXPForContribution,
@@ -74,6 +76,14 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: "You must be signed in to contribute" },
+        { status: 401 }
+      );
+    }
+
     const data = await request.json();
     
     // Validate contribution type - match Prisma enum
@@ -97,7 +107,7 @@ export async function POST(request: NextRequest) {
       data: {
         type: data.type,
         content: data.content || "",
-        userId: data.userId || "anonymous", // Should get from auth
+        userId: session.user.id,
         vehicleId: data.vehicleId,
         status: data.status || "PENDING",
         xpReward: calculateXPForContribution(data.type),

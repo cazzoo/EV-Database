@@ -24,8 +24,8 @@ declare module "next-auth/jwt" {
 }
 
 // Create NextAuth handler
-const handler = NextAuth({
-  secret: process.env.NEXTAUTH_SECRET || "fallback-secret-change-me",
+export const authOptions = {
+  secret: process.env.NEXTAUTH_SECRET,
   providers: [
     CredentialsProvider({
       name: "Credentials",
@@ -90,7 +90,9 @@ const handler = NextAuth({
     signIn: "/auth/login",
     error: "/auth/error",
   },
-});
+};
+
+const handler = NextAuth(authOptions);
 
 // Export GET and POST for API routes
 export { handler as GET, handler as POST };

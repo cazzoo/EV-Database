@@ -11,65 +11,6 @@ export const ROLES = [
 
 type Role = (typeof ROLES)[number];
 
-export const ACHIEVEMENTS = [
-  {
-    id: "first_edit",
-    name: "First Steps",
-    description: "Make your first contribution",
-    xpReward: 10,
-    icon: "✏️",
-  },
-  {
-    id: "data_master",
-    name: "Data Master",
-    description: "Add 10 new EV entries",
-    xpReward: 100,
-    icon: "📊",
-  },
-  {
-    id: "quality_contributor",
-    name: "Quality Contributor",
-    description: "Have 5 contributions approved",
-    xpReward: 50,
-    icon: "✅",
-  },
-  {
-    id: "streak_week",
-    name: "Consistent",
-    description: "Contribute for 7 days in a row",
-    xpReward: 75,
-    icon: "🔥",
-  },
-  {
-    id: "streak_month",
-    name: "Dedicated",
-    description: "Contribute for 30 days in a row",
-    xpReward: 300,
-    icon: "⭐",
-  },
-  {
-    id: "reviewer",
-    name: "Quality Guardian",
-    description: "Review 25 contributions",
-    xpReward: 125,
-    icon: "🔍",
-  },
-  {
-    id: "helpful",
-    name: "Helpful Hand",
-    description: "Receive 10 upvotes on contributions",
-    xpReward: 50,
-    icon: "👍",
-  },
-  {
-    id: "expert_verifier",
-    name: "Expert Verifier",
-    description: "Verify 50 contributions",
-    xpReward: 250,
-    icon: "🎯",
-  },
-] as const;
-
 // Match Prisma schema ContributionType enum
 export const CONTRIBUTION_TYPES: Record<string, { xp: number; credits: number }> = {
   ADD_VEHICLE: { xp: 25, credits: 5 },

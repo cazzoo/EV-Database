@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Github, Twitter } from "lucide-react";
+import { Github } from "lucide-react";
 
 export default function Footer() {
   return (
@@ -16,10 +16,7 @@ export default function Footer() {
       </nav>
       <nav>
         <div className="grid grid-flow-col gap-4">
-          <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-circle">
-            <Twitter className="h-5 w-5" />
-          </a>
-          <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-circle">
+          <a href="https://github.com/cazzoo/EV-Database" target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-circle">
             <Github className="h-5 w-5" />
           </a>
 

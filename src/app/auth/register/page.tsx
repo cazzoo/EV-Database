@@ -3,12 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, Mail, Lock, User } from "lucide-react";
-import bcrypt from "bcryptjs";
 
 export default function RegisterPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -36,10 +34,7 @@ export default function RegisterPage() {
     }
 
     try {
-      // Hash password
-      const hashedPassword = await bcrypt.hash(password, 10);
-
-      // Create user
+      // Create user (password is hashed server-side)
       const response = await fetch("/api/auth/register", {
         method: "POST",
         headers: {
@@ -48,8 +43,7 @@ export default function RegisterPage() {
         body: JSON.stringify({
           name,
           email,
-          username,
-          password: hashedPassword,
+          password,
         }),
       });
 
@@ -109,23 +103,6 @@ export default function RegisterPage() {
                   className="input input-bordered pl-10"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="form-control">
-              <label className="label">
-                <span className="label-text">Username</span>
-              </label>
-              <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-base-content/50" />
-                <input
-                  type="text"
-                  placeholder="johndoe"
-                  className="input input-bordered pl-10"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
                   required
                 />
               </div>

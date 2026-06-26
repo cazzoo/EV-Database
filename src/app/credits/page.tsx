@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { CreditCard, Zap, Shield, Badge, DollarSign, CheckCircle, Activity, TrendingUp, Database } from "lucide-react";
+import UsageStats from "@/components/credits/UsageStats";
 
 const CREDIT_PACKAGES = [
   {
@@ -432,30 +433,7 @@ export default function CreditsPage() {
               All API calls are automatically tracked. You can monitor your usage in real-time
               through the dashboard or by checking your credit balance.
             </p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="stat bg-base-200 rounded-lg">
-                <div className="stat-title">Total API Calls</div>
-                <div className="stat-value text-primary">-</div>
-                <div className="stat-desc">This month</div>
-              </div>
-              <div className="stat bg-base-200 rounded-lg">
-                <div className="stat-title">Credits Used</div>
-                <div className="stat-value text-secondary">-</div>
-                <div className="stat-desc">This month</div>
-              </div>
-              <div className="stat bg-base-200 rounded-lg">
-                <div className="stat-title">Avg Response Time</div>
-                <div className="stat-value text-accent">-</div>
-                <div className="stat-desc">Last 30 days</div>
-              </div>
-            </div>
-            <div className="alert alert-info mt-6">
-              <Activity className="h-6 w-6" />
-              <div>
-                <h4 className="font-bold">Pro Tip</h4>
-                <p className="text-sm">Check your dashboard for detailed usage analytics including endpoint breakdown, error rates, and response times.</p>
-              </div>
-            </div>
+            <UsageStats />
           </div>
         </div>
 

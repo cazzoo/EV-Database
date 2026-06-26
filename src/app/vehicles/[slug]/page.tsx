@@ -7,9 +7,6 @@ import {
   Edit,
   ChevronLeft,
   ChevronRight,
-  Heart,
-  Share2,
-  Flag,
   Star,
   Gauge,
 } from "lucide-react";
@@ -17,6 +14,7 @@ import { prisma } from "@/lib/prisma";
 import { vehicleSlug, voteScore } from "@/lib/vehicles";
 import { formatCurrency, formatNumber, formatDate, timeAgo } from "@/lib/format";
 import VehicleReviewForm from "@/components/vehicles/VehicleReviewForm";
+import VehicleActions from "@/components/vehicles/VehicleActions";
 
 interface VehiclePageProps {
   params: Promise<{ slug: string }>;
@@ -85,20 +83,7 @@ export default async function VehiclePage({ params }: VehiclePageProps) {
                       {vehicle.performance?.drivetrain ? ` • ${vehicle.performance.drivetrain}` : ""}
                     </p>
                   </div>
-                  <div className="flex gap-2">
-                    <button className="btn btn-ghost btn-circle" title="Save">
-                      <Heart className="h-5 w-5" />
-                    </button>
-                    <button
-                      className="btn btn-ghost btn-circle"
-                      title="Share"
-                    >
-                      <Share2 className="h-5 w-5" />
-                    </button>
-                    <Link href="/contribute" className="btn btn-ghost btn-circle" title="Report issue">
-                      <Flag className="h-5 w-5" />
-                    </Link>
-                  </div>
+                  <VehicleActions slug={slug} />
                 </div>
 
                 <div className="flex items-center gap-2 mt-4">
