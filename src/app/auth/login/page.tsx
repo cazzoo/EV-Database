@@ -4,6 +4,7 @@ import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, Mail, Lock } from "lucide-react";
+import DevQuickLogin from "@/components/auth/DevQuickLogin";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -48,6 +49,12 @@ export default function LoginPage() {
               Sign in to your EV Hub account
             </p>
           </div>
+
+          {process.env.NODE_ENV === "development" && (
+            <div className="mb-4">
+              <DevQuickLogin />
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="form-control">

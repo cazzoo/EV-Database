@@ -45,6 +45,8 @@ async function main() {
     { name: 'AmpedUp', email: 'amped@example.com', xp: 1400, level: 3, credits: 280, role: 'CONTRIBUTOR' },
     { name: 'WattWatcher', email: 'watt@example.com', xp: 850, level: 2, credits: 190, role: 'CONTRIBUTOR' },
     { name: 'NewDriver', email: 'newdriver@example.com', xp: 120, level: 1, credits: 105, role: 'NEWCOMER' },
+    { name: 'ModMaster', email: 'moderator@example.com', xp: 3500, level: 4, credits: 600, role: 'MODERATOR' },
+    { name: 'AdminUser', email: 'admin@example.com', xp: 12000, level: 7, credits: 2000, role: 'ADMIN' },
   ];
 
   const createdUsers = [demoUser];
